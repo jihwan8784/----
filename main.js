@@ -171,25 +171,17 @@ function renderPartCoordinates(coordinates = latestAvatarCoordinates) {
 }
 
 function applyOptionSelection(changedGroup = 'theme') {
-  currentSelection = normalizeSelection({
-    ...currentSelection,
-    ...Object.fromEntries(Object.entries(optionSelects).map(([key, select]) => [key, select.value])),
-  });
+  currentSelection = normalizeSelection(currentSelection);
   localStorage.setItem('poseVisionAvatarSelection', JSON.stringify(currentSelection));
   liveAvatar?.updateAppearance(readStoredAvatarOptions());
   showOptionReference(changedGroup);
 }
 
 function syncControlsFromSelection() {
-  fillSelect(optionSelects.gender, OPTION_GROUPS.gender, currentSelection.gender);
-  fillSelect(optionSelects.age, OPTION_GROUPS.age, currentSelection.age);
-  fillSelect(optionSelects.body, OPTION_GROUPS.bodyByGender[currentSelection.gender], currentSelection.body);
-  fillSelect(optionSelects.faceShape, OPTION_GROUPS.faceShape, currentSelection.faceShape);
-  fillSelect(optionSelects.occupation, OPTION_GROUPS.occupation, currentSelection.occupation);
-  fillSelect(optionSelects.background, OPTION_GROUPS.background, currentSelection.background);
-  fillSelect(optionSelects.theme, OPTION_GROUPS.theme, currentSelection.theme);
-  fillSelect(optionSelects.hairStyle, OPTION_GROUPS.hairStyle, currentSelection.hairStyle);
-  fillSelect(optionSelects.accessory, OPTION_GROUPS.accessory, currentSelection.accessory);
+  Object.entries(optionSelects).forEach(([group, select]) => {
+    const choices = group === 'body' ? OPTION_GROUPS.bodyByGender[currentSelection.gender] : OPTION_GROUPS[group];
+    document.querySelectorAll(`[id="${select.id}"]`).forEach(control => fillSelect(control, choices, currentSelection[group]));
+  });
   Object.keys(colorPalettes).forEach(syncPaletteSelection);
 }
 
@@ -198,17 +190,18 @@ function initializeOptionControls() {
   syncControlsFromSelection();
 
   Object.entries(optionSelects).forEach(([group, select]) => {
-    select.addEventListener('change', () => {
+    document.querySelectorAll(`[id="${select.id}"]`).forEach(control => control.addEventListener('change', () => {
+      currentSelection[group] = control.value;
       if (group === 'gender') {
-        currentSelection.gender = select.value;
         const bodies = OPTION_GROUPS.bodyByGender[currentSelection.gender];
-        const nextBody = bodies.some(option => option.value === optionSelects.body.value)
-          ? optionSelects.body.value
+        const nextBody = bodies.some(option => option.value === currentSelection.body)
+          ? currentSelection.body
           : 'standard';
-        fillSelect(optionSelects.body, bodies, nextBody);
+        currentSelection.body = nextBody;
       }
+      syncControlsFromSelection();
       applyOptionSelection(group);
-    });
+    }));
   });
 }
 

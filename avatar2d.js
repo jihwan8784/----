@@ -29,6 +29,26 @@ const BACKGROUNDS = Object.freeze({
   'rainy-neon-street': { sky: '#080a10', floor: '#10151c', line: '#ef5bb8', structure: '#171b24' },
 });
 
+const BACKGROUND_IMAGES = Object.freeze({
+  'neon-future-city': new URL('./assets/backgrounds/creator-studio-night.png', import.meta.url).href,
+  'space-station': new URL('./assets/backgrounds/space-station.png', import.meta.url).href,
+  laboratory: new URL('./assets/backgrounds/laboratory.png', import.meta.url).href,
+  'rainy-neon-street': new URL('./assets/backgrounds/rainy-neon-street.png', import.meta.url).href,
+});
+const backgroundImageCache = new Map();
+
+function getBackgroundImage(style) {
+  const src = BACKGROUND_IMAGES[style];
+  if (!src) return null;
+  if (!backgroundImageCache.has(src)) {
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = src;
+    backgroundImageCache.set(src, image);
+  }
+  return backgroundImageCache.get(src);
+}
+
 const fadedImageCache = new WeakMap();
 const limbSegmentCache = new WeakMap();
 
@@ -118,6 +138,15 @@ function trackedRig(pose, mirror, width, height) {
         middle.y + (middle.y - start.y) * 0.92,
       );
     }
+    const constrainBone = (from, to, referenceFrom, referenceTo) => {
+      const referenceLength = distance(referenceFrom, referenceTo) * distanceScale;
+      const measuredLength = distance(from, to);
+      const safeLength = clamp(measuredLength, referenceLength * 0.72, referenceLength * 1.28);
+      const direction = unitBetween(from, to);
+      return point(from.x + direction.x * safeLength, from.y + direction.y * safeLength);
+    };
+    middle = constrainBone(start, middle, fallbackChain[0], fallbackChain[1]);
+    end = constrainBone(middle, end, fallbackChain[1], fallbackChain[2]);
     return [start, middle, end];
   };
 
@@ -153,6 +182,19 @@ function loadImage(src) {
 }
 
 function drawBackground(context, width, height, style) {
+  const photo = getBackgroundImage(style);
+  if (photo?.complete && photo.naturalWidth) {
+    const scale = Math.max(width / photo.naturalWidth, height / photo.naturalHeight);
+    const drawWidth = photo.naturalWidth * scale;
+    const drawHeight = photo.naturalHeight * scale;
+    context.drawImage(photo, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+    const shade = context.createLinearGradient(0, 0, 0, height);
+    shade.addColorStop(0, 'rgba(3, 8, 13, 0.08)');
+    shade.addColorStop(1, 'rgba(3, 8, 13, 0.32)');
+    context.fillStyle = shade;
+    context.fillRect(0, 0, width, height);
+    return;
+  }
   const palette = BACKGROUNDS[style] || BACKGROUNDS['neon-future-city'];
   context.fillStyle = palette.sky;
   context.fillRect(0, 0, width, height);
@@ -311,7 +353,9 @@ function drawBaseAvatar(context, rig, options) {
     context.lineTo(chain[2].x, chain[2].y);
     context.stroke();
   };
-  const limbWidth = clamp(distance(shoulderCenter, hipCenter) * 0.20, 16, 42);
+  const buildScale = options.bodyVariant === 'slim' ? 0.82
+    : ['muscular', 'volume'].includes(options.bodyVariant) ? 1.18 : 1;
+  const limbWidth = clamp(distance(shoulderCenter, hipCenter) * 0.20 * buildScale, 14, 48);
   drawLimb(rig.legLeft, options.bottomColor, limbWidth);
   drawLimb(rig.legRight, options.bottomColor, limbWidth);
   drawLimb(rig.armLeft, options.topColor, limbWidth * 0.85);
@@ -326,13 +370,51 @@ function drawBaseAvatar(context, rig, options) {
   context.closePath();
   context.fill();
 
-  const headRadius = clamp(distance(rig.shoulderLeft, rig.shoulderRight) * 0.28, 24, 62);
+  const headRadius = clamp(distance(rig.shoulderLeft, rig.shoulderRight) * 0.28 * (options.headScale || 1), 24, 66);
   const down = unitBetween(shoulderCenter, hipCenter);
   const headCenter = point(shoulderCenter.x - down.x * headRadius * 1.45, shoulderCenter.y - down.y * headRadius * 1.45);
   context.fillStyle = options.skinColor;
   context.beginPath();
-  context.arc(headCenter.x, headCenter.y, headRadius, 0, Math.PI * 2);
+  const faceX = options.faceShape === 'round' ? 1 : options.faceShape === 'angular' ? 0.86 : 0.92;
+  context.ellipse(headCenter.x, headCenter.y, headRadius * faceX, headRadius, 0, 0, Math.PI * 2);
   context.fill();
+
+  context.fillStyle = options.hairColor;
+  context.beginPath();
+  const hairDrop = options.hairStyle === 'long' ? headRadius * 1.35 : options.hairStyle === 'bob' ? headRadius * 0.82 : headRadius * 0.45;
+  context.ellipse(headCenter.x, headCenter.y - headRadius * 0.42, headRadius * faceX * 1.04, headRadius * 0.72, 0, Math.PI, Math.PI * 2);
+  if (['long', 'bob', 'ponytail'].includes(options.hairStyle)) {
+    context.rect(headCenter.x - headRadius * faceX, headCenter.y - headRadius * 0.35, headRadius * faceX * 2, hairDrop);
+  }
+  context.fill();
+
+  context.fillStyle = options.eyeColor;
+  const eyeY = headCenter.y - headRadius * 0.05;
+  for (const side of [-1, 1]) {
+    context.beginPath();
+    context.arc(headCenter.x + side * headRadius * 0.34, eyeY, Math.max(2, headRadius * 0.07), 0, Math.PI * 2);
+    context.fill();
+  }
+  context.strokeStyle = options.accentColor;
+  context.lineWidth = Math.max(2, headRadius * 0.06);
+  if (options.accessoryStyle === 'glasses') {
+    context.strokeRect(headCenter.x - headRadius * 0.68, eyeY - headRadius * 0.2, headRadius * 0.55, headRadius * 0.38);
+    context.strokeRect(headCenter.x + headRadius * 0.13, eyeY - headRadius * 0.2, headRadius * 0.55, headRadius * 0.38);
+  } else if (options.accessoryStyle === 'headphones') {
+    context.beginPath();
+    context.arc(headCenter.x, headCenter.y, headRadius * 1.08, Math.PI * 1.08, Math.PI * 1.92);
+    context.stroke();
+  }
+
+  context.fillStyle = options.accentColor;
+  const badge = options.occupation === 'doctor' ? '+' : options.occupation === 'police' ? '★'
+    : options.occupation === 'firefighter' ? 'F' : options.occupation === 'teacher' ? 'T'
+      : options.occupation === 'singer' ? '♪' : options.occupation === 'chef' ? 'C' : '';
+  if (badge) {
+    context.font = `700 ${Math.max(14, limbWidth * 0.75)}px system-ui`;
+    context.textAlign = 'center';
+    context.fillText(badge, shoulderCenter.x, mix(shoulderCenter, hipCenter, 0.42).y);
+  }
 }
 
 export function create2DAvatar(container, initialOptions = {}, runtimeOptions = {}) {
