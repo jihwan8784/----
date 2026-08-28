@@ -33,6 +33,7 @@ const confidenceValue = document.getElementById('confidenceValue');
 const showSkeletonCheckbox = document.getElementById('showSkeletonCheckbox');
 const mirrorCameraCheckbox = document.getElementById('mirrorCameraCheckbox');
 const captureStatus = document.getElementById('captureStatus');
+const completeOptionsButton = document.getElementById('completeOptionsButton');
 const randomizeOptionsButton = document.getElementById('randomizeOptionsButton');
 const resetOptionsButton = document.getElementById('resetOptionsButton');
 const optionSelects = {
@@ -665,12 +666,9 @@ async function uploadCaptureToDrive() {
   }
 }
 
-<<<<<<< HEAD
 completeOptionsButton.addEventListener('click', startTracking);
 randomizeOptionsButton.addEventListener('click', randomizeOptions);
 resetOptionsButton.addEventListener('click', resetOptions);
-=======
->>>>>>> 6ec7b2d53f84fb0d8420082ab0341a6aba1c28a0
 captureButton.addEventListener('click', captureComposite);
 driveConnectButton.addEventListener('click', connectGoogleDrive);
 driveSaveButton.addEventListener('click', uploadCaptureToDrive);

@@ -38,7 +38,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 }
 
 h1, h2, p { margin-top: 0; }
-<<<<<<< HEAD
 h1 { margin-bottom: 10px; font-size: clamp(2rem, 5vw, 3.6rem); }
 .setup-header > p:last-child, .option-description { color: var(--muted); }
 
@@ -186,9 +185,7 @@ h1 { margin-bottom: 10px; font-size: clamp(2rem, 5vw, 3.6rem); }
   font-weight: 850;
 }
 .setup-status, .capture-status { min-height: 20px; margin: 0; color: var(--muted); font-size: 0.82rem; }
-=======
-h1 { margin-bottom: 8px; font-size: 1.55rem; letter-spacing: 0; }
->>>>>>> 6ec7b2d53f84fb0d8420082ab0341a6aba1c28a0
+.options-heading h1 { margin-bottom: 8px; font-size: 1.55rem; letter-spacing: 0; }
 
 .tracking-stage {
   position: relative;
@@ -381,7 +378,6 @@ h1 { margin-bottom: 8px; font-size: 1.55rem; letter-spacing: 0; }
 .coordinate-empty { padding: 18px 0; color: var(--muted); font-size: 0.78rem; }
 
 @media (max-width: 780px) {
-<<<<<<< HEAD
   .option-setup { width: min(100% - 22px, 620px); padding: 26px 0; }
   .option-layout { grid-template-columns: 1fr; height: auto; min-height: 0; }
   .option-visual { min-height: 52vh; }
@@ -390,12 +386,10 @@ h1 { margin-bottom: 8px; font-size: 1.55rem; letter-spacing: 0; }
   .option-fields { grid-template-columns: 1fr; }
   .custom-actions { grid-template-columns: 1fr 1fr; }
   .custom-actions .primary-action { grid-column: 1 / -1; }
-=======
   .tracking-stage { height: auto; min-height: 100dvh; overflow: visible; }
   .tracking-columns { position: relative; grid-template-columns: 1fr; grid-template-rows: 54dvh auto; }
   .avatar-panel { min-height: 420px; }
   .avatar-options-panel { overflow: visible; border-top: 1px solid var(--line); border-left: 0; padding: 24px 18px 32px; }
->>>>>>> 6ec7b2d53f84fb0d8420082ab0341a6aba1c28a0
   .status-pill { top: 12px; left: 12px; }
   .action-bar { right: 12px; bottom: 12px; left: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hud-button { min-height: 36px; padding: 0 6px; font-size: 0.72rem; }
