@@ -1,30 +1,34 @@
-# Pose Vision
+# VRM 아바타 캡처 스튜디오
+
+네 개의 아바타 프로젝트에서 실시간 추적, VRM 렌더링, 촬영 UI를 하나로 통합한 웹 앱입니다.
+
+## 주요 기능
+
+- MediaPipe 기반 전신·얼굴·손가락 추적
+- VRM 0.x / 1.0 아바타만 지원
+- 내장 VRM 3종 선택 또는 로컬 `.vrm` 파일 업로드
+- 다크·스튜디오·크로마키·투명 배경
+- 촬영 버튼 클릭 후 3초 카운트다운
+- 사진을 `YYYY-MM-DD_HH-mm-ss.png` 이름으로 자동 다운로드
+- WebM 녹화와 OBS용 투명 배경 팝아웃
+- 카메라 영상과 추적 데이터는 브라우저 안에서만 처리
 
 ## 실행
 
-```powershell
-Copy-Item .env.example .env
-notepad .env
-node server.cjs
+```bash
+npm install
+npm run dev
 ```
 
-브라우저에서 `http://127.0.0.1:8000/main.html`을 엽니다.
+카메라는 localhost 또는 HTTPS 환경에서만 사용할 수 있습니다.
 
-## 현재 흐름
+## 내장 아바타
 
-1. 성별·연령대·체형·얼굴형·헤어·컬러·직업 의상·배경 커스텀
-2. 카메라 시작 및 MediaPipe Pose Lite 트래킹
-3. 사람 관절 위치에 2D VTuber 아바타 합성
-4. 현재 화면 PNG 캡처
-5. 선택적으로 Google Drive 저장
+Avatar A, B, C는 VRoid 공식 샘플 모델이며 [VRoid 샘플 모델 이용 조건](https://vroid.pixiv.help/hc/en-us/articles/4402394424089-VRoidPreset-A-Z)을 따릅니다.
 
-## 구성
+## 통합 출처
 
-- `main.html`, `main.css`, `main.js`: 화면과 실시간 합성
-- `poseLandmarker.js`, `ui.js`: 포즈·표정 인식과 스켈레톤
-- `avatarObj.js`: 파츠형 3D 아바타 생성 및 포즈 관절 연결
-- `avatarOptions.js`: 아바타 커스텀 옵션과 스타일 매핑
-- `server.cjs`: 정적 서버, Gemini 및 Google 설정 API
-- `GOOGLE_DRIVE_SETUP.md`: Google Drive 연결 방법
-
-아바타는 동일한 기본 실루엣에 선택한 헤어·얼굴·직업 장비·색상 파츠를 조합해 생성합니다. Gemini 분석 API는 선택 기능으로 서버에 유지되어 있습니다.
+- [vision20400/webcam-avatar-studio](https://github.com/vision20400/webcam-avatar-studio): VRM·MediaPipe 추적 엔진
+- [LPRS1234/pose-persona-booth](https://github.com/LPRS1234/pose-persona-booth): 포토부스 촬영 흐름
+- [jihwan8784/project](https://github.com/jihwan8784/project): 아바타 선택·합성 UI
+- [jihwan8784/----](https://github.com/jihwan8784/----): 통합 대상 프로젝트
