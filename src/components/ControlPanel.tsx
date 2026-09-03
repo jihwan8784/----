@@ -9,16 +9,31 @@ import { Button, ColorField, Panel, Segmented, Slider, Toggle } from "./ui";
 type Engine = ReturnType<typeof useAvatarEngine>;
 
 const VRM_PRESETS = [
-  { name: "Avatar A", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/stable/AvatarSample_A.vrm" },
-  { name: "Avatar B", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/stable/AvatarSample_B.vrm" },
-  { name: "Avatar C", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/stable/AvatarSample_C.vrm" },
+  { name: "Avatar A", label: "기본 A", group: "기본", accent: "#7c8cff", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/stable/AvatarSample_A.vrm" },
+  { name: "Avatar B", label: "기본 B", group: "기본", accent: "#34d399", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/stable/AvatarSample_B.vrm" },
+  { name: "Avatar C", label: "기본 C", group: "기본", accent: "#fb7185", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/stable/AvatarSample_C.vrm" },
+  { name: "Sakurada Fumiriya", label: "후미리야", group: "남성", accent: "#38bdf8", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sakurada_Fumiriya.vrm" },
+  { name: "Hair Sample Male", label: "헤어 스타일 남성", group: "남성", accent: "#60a5fa", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/HairSample_Male.vrm" },
+  { name: "Sendagaya Shino", label: "시노", group: "여성", accent: "#f472b6", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sendagaya_Shino.vrm" },
+  { name: "Victoria Rubin", label: "빅토리아", group: "여성", accent: "#c084fc", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Victoria_Rubin.vrm" },
+  { name: "Vita", label: "비타", group: "개성", accent: "#f59e0b", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Vita.vrm" },
+  { name: "Vivi", label: "비비", group: "개성", accent: "#22d3ee", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Vivi.vrm" },
+  { name: "Darkness Shibu", label: "다크니스", group: "개성", accent: "#a78bfa", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Darkness_Shibu.vrm" },
 ];
+
+const VRM_GROUPS = ["전체", "기본", "남성", "여성", "개성"] as const;
 
 export function ControlPanel({ engine }: { engine: Engine }) {
   const s = useSettings();
   const fileRef = useRef<HTMLInputElement>(null);
   const objectUrl = useRef<string | null>(null);
   const [vrmInput, setVrmInput] = useState("");
+  const [vrmGroup, setVrmGroup] =
+    useState<(typeof VRM_GROUPS)[number]>("전체");
+  const visiblePresets =
+    vrmGroup === "전체"
+      ? VRM_PRESETS
+      : VRM_PRESETS.filter((preset) => preset.group === vrmGroup);
   const validVrmUrl = (() => {
     try {
       return new URL(vrmInput.trim()).pathname.toLowerCase().endsWith(".vrm");
@@ -109,12 +124,29 @@ export function ControlPanel({ engine }: { engine: Engine }) {
         />
       </Panel>
 
-      <Panel title="VRM 아바타" hint="내장 모델을 고르거나 자신의 .vrm 파일을 올릴 수 있습니다.">
-        <div className="grid grid-cols-3 gap-2">
-          {VRM_PRESETS.map((preset) => (
+      <Panel title="VRM 아바타" hint="행사장에서 사용할 아바타를 빠르게 골라보세요.">
+        <div className="flex flex-wrap gap-1.5">
+          {VRM_GROUPS.map((group) => (
+            <button
+              key={group}
+              type="button"
+              onClick={() => setVrmGroup(group)}
+              className={`rounded-full border px-3 py-1.5 text-[12px] font-medium transition ${
+                vrmGroup === group
+                  ? "border-white/40 bg-white text-black"
+                  : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+              }`}
+            >
+              {group}
+            </button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {visiblePresets.map((preset) => (
             <button
               key={preset.url}
               type="button"
+              disabled={engine.avatarLoading}
               onClick={() =>
                 s.patch({
                   avatarKind: "vrm",
@@ -122,18 +154,27 @@ export function ControlPanel({ engine }: { engine: Engine }) {
                   vrmName: preset.name,
                 })
               }
-              className={`rounded-xl border px-2 py-3 text-[11px] transition ${
+              className={`relative overflow-hidden rounded-xl border px-3 py-3 text-left transition disabled:cursor-wait disabled:opacity-55 ${
                 s.vrmUrl === preset.url
                   ? "border-indigo-400 bg-indigo-500/25 text-white"
                   : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
               }`}
             >
-              {preset.name}
+              <span
+                className="absolute inset-y-0 left-0 w-1"
+                style={{ backgroundColor: preset.accent }}
+              />
+              <span className="block text-[13px] font-semibold">{preset.label}</span>
+              <span className="mt-0.5 block text-[11px] text-white/40">
+                {preset.group} · VRM
+              </span>
             </button>
           ))}
         </div>
         <p className="rounded-lg bg-black/25 px-3 py-2 text-[11px] text-white/50">
-          현재 아바타: {s.vrmName ?? "없음"}
+          {engine.avatarLoading
+            ? "아바타를 불러오는 중…"
+            : `현재 아바타: ${s.vrmName ?? "없음"}`}
         </p>
 
         <input
