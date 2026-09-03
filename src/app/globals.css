@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+:root {
+  --background: #07080f;
+  --foreground: #eef0f8;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  overscroll-behavior: none;
+}
+
+/* The embed route is meant to be composited over another scene. */
+body.transparent-stage {
+  background: transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.12);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
