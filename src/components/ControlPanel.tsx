@@ -65,13 +65,7 @@ const BACKGROUND_PRESETS = [
   },
 ] as const;
 
-export function ControlPanel({
-  engine,
-  onCameraPreviewChange,
-}: {
-  engine: Engine;
-  onCameraPreviewChange: (show: boolean) => void;
-}) {
+export function ControlPanel({ engine }: { engine: Engine }) {
   const s = useSettings();
   const fileRef = useRef<HTMLInputElement>(null);
   const backgroundRef = useRef<HTMLInputElement>(null);
@@ -300,7 +294,7 @@ export function ControlPanel({
           label="웹캠 미리보기"
           hint="숨겨도 아바타 움직임 추적은 계속됩니다"
           checked={s.showCamera}
-          onChange={onCameraPreviewChange}
+          onChange={(v) => s.set("showCamera", v)}
         />
         <Toggle
           label="스켈레톤 표시"

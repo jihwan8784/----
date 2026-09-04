@@ -31,8 +31,6 @@ export async function loadVRMRig(
 
   VRMUtils.removeUnnecessaryVertices(gltf.scene);
   VRMUtils.combineSkeletons(gltf.scene);
-  // VRM 0.x faces -Z while VRM 1.0 faces +Z. This normalizes 0.x models to
-  // +Z, which is also where the booth camera is positioned.
   VRMUtils.rotateVRM0(vrm);
 
   vrm.scene.traverse((obj) => {

@@ -42,20 +42,11 @@ export function AvatarStudio() {
     }
   }, [s.showSkeleton, s.showCamera]);
 
-  useEffect(() => {
-    if (!previewExpanded) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPreviewExpanded(false);
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [previewExpanded]);
-
   const tracked = engine.running;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <header className="flex flex-wrap items-center gap-2 border-b border-white/10 px-3 py-2.5 sm:gap-3 sm:px-4">
+      <header className="flex items-center gap-3 border-b border-white/10 px-4 py-2.5">
         <div className="flex items-center gap-2">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-indigo-500 text-[13px] font-bold">
             A
@@ -88,12 +79,8 @@ export function AvatarStudio() {
               정지
             </Button>
           ) : (
-            <Button
-              variant="primary"
-              disabled={engine.cameraBusy}
-              onClick={() => engine.startCamera()}
-            >
-              {engine.cameraBusy ? "준비 중…" : "카메라 시작"}
+            <Button variant="primary" onClick={() => engine.startCamera()}>
+              카메라 시작
             </Button>
           )}
           <Button
@@ -159,7 +146,7 @@ export function AvatarStudio() {
           <div
             className={`absolute overflow-hidden border border-white/15 bg-black/90 shadow-lg backdrop-blur ${
               previewExpanded
-                ? "fixed inset-0 z-50 flex w-full flex-col rounded-none"
+                ? "inset-0 z-20 flex w-full flex-col rounded-none"
                 : "bottom-4 left-4 w-56 rounded-xl"
             } ${
               s.showCamera ? "" : "hidden"
@@ -206,7 +193,6 @@ export function AvatarStudio() {
               <select
                 value={engine.deviceId ?? ""}
                 onChange={(e) => engine.startCamera(e.target.value)}
-                disabled={engine.cameraBusy}
                 className="w-full bg-black/60 px-2 py-1.5 text-[11px] text-white/70 outline-none"
               >
                 {engine.devices.map((d, i) => (
@@ -221,13 +207,7 @@ export function AvatarStudio() {
 
         {panelOpen ? (
           <aside className="w-[300px] shrink-0 overflow-y-auto border-l border-white/10 bg-black/25 p-3">
-            <ControlPanel
-              engine={engine}
-              onCameraPreviewChange={(show) => {
-                if (!show) setPreviewExpanded(false);
-                s.set("showCamera", show);
-              }}
-            />
+            <ControlPanel engine={engine} />
           </aside>
         ) : null}
       </div>

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check:rig": "node --import tsx scripts/rig-check.mts",
+    "check:rig": "tsx scripts/rig-check.mts",
     "postinstall": "node scripts/copy-wasm.mjs"
   },
   "dependencies": {

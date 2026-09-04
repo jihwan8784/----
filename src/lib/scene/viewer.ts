@@ -31,20 +31,6 @@ const PRESETS: Record<CameraPreset, { pos: [number, number, number]; target: num
   };
 
 const TARGET_RENDER_INTERVAL_MS = 1000 / 30;
-const TRACKING_STALE_AFTER_MS = 750;
-
-const IDLE_FRAME: TrackFrame = {
-  ts: 0,
-  hasPose: false,
-  hasFace: false,
-  joints: {},
-  confidence: {},
-  headQuat: null,
-  blendshapes: {},
-  hands: { left: null, right: null },
-  rootOffset: { x: 0, y: 0, z: 0 },
-  overlay: { pose: null, face: null, hands: [] },
-};
 
 function gradientTexture(top: string, bottom: string) {
   const c = document.createElement("canvas");
@@ -162,10 +148,6 @@ export class AvatarViewer {
 
   pushFrame(frame: TrackFrame) {
     this.frame = frame;
-  }
-
-  clearTracking() {
-    this.frame = IDLE_FRAME;
   }
 
   setBackground(kind: BackgroundKind, chroma?: string, customUrl?: string | null) {
@@ -305,22 +287,19 @@ export class AvatarViewer {
       }
     }
 
-    if (this.rig && this.solver) {
-      const frame =
-        this.frame && performance.now() - this.frame.ts <= TRACKING_STALE_AFTER_MS
-          ? this.frame
-          : IDLE_FRAME;
-      this.solver.apply(frame, dt);
-      this.applyFace(frame, dt);
+    if (this.rig && this.solver && this.frame) {
+      this.solver.apply(this.frame, dt);
+      this.applyFace(dt);
     }
     this.rig?.update(dt);
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }
 
-  private applyFace(frame: TrackFrame, dt: number) {
+  private applyFace(dt: number) {
     const rig = this.rig;
-    if (!rig) return;
+    const frame = this.frame;
+    if (!rig || !frame) return;
 
     this.face = frame.hasFace
       ? driveFromBlendshapes(frame.blendshapes, this.expressionGain)
