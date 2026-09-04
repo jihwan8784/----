@@ -47,6 +47,7 @@ export function useAvatarEngine({
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [cameraBusy, setCameraBusy] = useState(false);
   const [recording, setRecording] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const capturingRef = useRef(false);
@@ -236,7 +237,11 @@ export function useAvatarEngine({
       }
       const requestId = ++cameraRequestRef.current;
       const previousStream = streamRef.current;
+      const currentDeviceId =
+        previousStream?.getVideoTracks()[0]?.getSettings().deviceId;
+      if (id && id === currentDeviceId && previousStream?.active) return;
       let nextStream: MediaStream | null = null;
+      setCameraBusy(true);
       try {
         setStatus(previousStream ? "카메라 전환 중…" : "카메라 여는 중…");
         nextStream = await navigator.mediaDevices.getUserMedia({
@@ -282,6 +287,8 @@ export function useAvatarEngine({
                 : "카메라를 시작하지 못했습니다.",
         );
         setStatus("");
+      } finally {
+        if (requestId === cameraRequestRef.current) setCameraBusy(false);
       }
     },
     [refreshDevices, videoRef],
@@ -294,13 +301,23 @@ export function useAvatarEngine({
     streamRef.current = null;
     const video = videoRef.current;
     if (video) video.srcObject = null;
+    viewerRef.current?.clearTracking();
+    setCameraBusy(false);
     setRunning(false);
     setStatus("");
   }, [videoRef]);
 
   useEffect(() => {
     return () => {
+      cameraRequestRef.current += 1;
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      const recorder = recorderRef.current;
+      if (recorder) {
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+        if (recorder.state !== "inactive") recorder.stop();
+        recorder.stream.getTracks().forEach((track) => track.stop());
+      }
     };
   }, []);
 
@@ -315,32 +332,23 @@ export function useAvatarEngine({
   const snapshot = useCallback(async () => {
     if (capturingRef.current) return;
     capturingRef.current = true;
-    for (let value = 3; value >= 1; value -= 1) {
-      setCountdown(value);
-      await new Promise((resolve) => window.setTimeout(resolve, 1000));
-    }
-    setCountdown(null);
-    const url = viewerRef.current?.snapshot();
-    if (!url) {
+    try {
+      for (let value = 3; value >= 1; value -= 1) {
+        setCountdown(value);
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+      }
+      const url = viewerRef.current?.snapshot();
+      if (!url) throw new Error("촬영 화면을 준비하지 못했습니다.");
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${downloadTimestamp()}.png`;
+      a.click();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "사진을 저장하지 못했습니다.");
+    } finally {
+      setCountdown(null);
       capturingRef.current = false;
-      return;
     }
-    const now = new Date();
-    const date = [
-      now.getFullYear(),
-      String(now.getMonth() + 1).padStart(2, "0"),
-      String(now.getDate()).padStart(2, "0"),
-    ].join("-");
-    const time = [
-      String(now.getHours()).padStart(2, "0"),
-      String(now.getMinutes()).padStart(2, "0"),
-      String(now.getSeconds()).padStart(2, "0"),
-    ].join("-");
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${date}_${time}.png`;
-    a.click();
-    capturingRef.current = false;
   }, []);
 
   const toggleRecording = useCallback(() => {
@@ -350,27 +358,50 @@ export function useAvatarEngine({
       recorderRef.current.stop();
       return;
     }
-    const stream = viewer.captureStream(30);
-    const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find(
-      (m) => MediaRecorder.isTypeSupported(m),
-    );
-    const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-    const chunks: BlobPart[] = [];
-    recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-    recorder.onstop = () => {
-      const blob = new Blob(chunks, { type: mime ?? "video/webm" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `avatar-${Date.now()}.webm`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-      recorderRef.current = null;
+    if (typeof MediaRecorder === "undefined") {
+      setError("이 브라우저는 영상 녹화를 지원하지 않습니다.");
+      return;
+    }
+    try {
+      const stream = viewer.captureStream(30);
+      const mime = [
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm",
+      ].find((candidate) => MediaRecorder.isTypeSupported(candidate));
+      const recorder = new MediaRecorder(
+        stream,
+        mime ? { mimeType: mime } : undefined,
+      );
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunks.push(event.data);
+      };
+      recorder.onerror = () => {
+        setError("영상 녹화 중 오류가 발생했습니다.");
+        if (recorder.state !== "inactive") recorder.stop();
+      };
+      recorder.onstop = () => {
+        recorder.stream.getTracks().forEach((track) => track.stop());
+        if (chunks.length > 0) {
+          const blob = new Blob(chunks, { type: mime ?? "video/webm" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${downloadTimestamp()}.webm`;
+          a.click();
+          window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+        }
+        recorderRef.current = null;
+        setRecording(false);
+      };
+      recorder.start();
+      recorderRef.current = recorder;
+      setRecording(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "영상 녹화를 시작하지 못했습니다.");
       setRecording(false);
-    };
-    recorder.start();
-    recorderRef.current = recorder;
-    setRecording(true);
+    }
   }, []);
 
   return {
@@ -381,6 +412,7 @@ export function useAvatarEngine({
     stats,
     devices,
     deviceId,
+    cameraBusy,
     avatarLabel,
     avatarLoading,
     recording,
@@ -392,4 +424,18 @@ export function useAvatarEngine({
     toggleRecording,
     setError,
   };
+}
+
+function downloadTimestamp(now = new Date()) {
+  const date = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+  const time = [
+    String(now.getHours()).padStart(2, "0"),
+    String(now.getMinutes()).padStart(2, "0"),
+    String(now.getSeconds()).padStart(2, "0"),
+  ].join("-");
+  return `${date}_${time}`;
 }
