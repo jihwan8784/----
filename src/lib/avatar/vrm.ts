@@ -33,6 +33,10 @@ export async function loadVRMRig(
   VRMUtils.combineSkeletons(gltf.scene);
   VRMUtils.rotateVRM0(vrm);
 
+  // The booth camera stays on +Z. Turn the normalized model once so the
+  // avatar's face, rather than its back, is presented to the visitor.
+  vrm.scene.rotateY(Math.PI);
+
   vrm.scene.traverse((obj) => {
     if (obj instanceof THREE.Mesh) {
       obj.castShadow = true;
