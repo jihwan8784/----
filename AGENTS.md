@@ -7,3 +7,9 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Avatar Studio version preservation
+
+- Before replacing a published Avatar Studio version, preserve a restorable source snapshot in `jihwan8784/project`.
+- Keep the active, validated Site source on `jihwan8784/----` `main` and deploy the same commit state to Sites.
+- Never overwrite or remove an archived version unless the user explicitly requests it.

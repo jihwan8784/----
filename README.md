@@ -6,8 +6,8 @@
 
 - MediaPipe 기반 전신·손가락 추적(항상 켜짐)
 - VRM 0.x / 1.0 아바타만 지원
-- 사람형 남성·여성 VRM과 짧은·긴 헤어 선택
-- 피부·머리 색과 9개 직업 콘셉트 커스텀
+- 비애니 스타일의 남성형·여성형 전신 VRM
+- 피부·복장·포인트 색과 9개 직업 모델 커스텀
 - 로컬 `.vrm` 파일 업로드
 - 다크·스튜디오·크로마키·투명 배경
 - 촬영 버튼 클릭 후 3초 카운트다운
@@ -26,7 +26,11 @@ npm run dev
 
 ## 내장 아바타
 
-내장된 후미리야, 헤어 스타일 남성, 시노, 빅토리아 모델은 VRoid가 공개한 VRM 샘플이며 [VRoid 샘플 모델 이용 조건](https://vroid.pixiv.help/hc/en-us/articles/4402394424089-VRoidPreset-A-Z)을 따릅니다.
+내장 아바타는 `jihwan8784/project`의 직업별 전신 GLB를 이 저장소의 변환 스크립트로 VRM 1.0 형식으로 만든 것입니다. 원본 자산의 사용 조건과 저작권 표시는 `jihwan8784/project`를 기준으로 합니다.
+
+```bash
+node scripts/convert-project-glb-to-vrm.mjs input.glb output.vrm "표시 이름"
+```
 
 ## 통합 출처
 

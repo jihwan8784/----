@@ -47,8 +47,8 @@ const initial: Settings = {
   mirror: true,
 
   avatarKind: "vrm",
-  vrmUrl: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sakurada_Fumiriya.vrm",
-  vrmName: "사람형 남성 · 짧은 머리",
+  vrmUrl: "/avatars/project/male-student.vrm",
+  vrmName: "남성형 학생",
   mannequin: DEFAULT_MANNEQUIN,
   skinColor: "#efc29f",
   hairColor: "#2a211f",

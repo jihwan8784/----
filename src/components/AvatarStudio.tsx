@@ -549,39 +549,53 @@ export function useAvatarEngine({
 
 type Engine = ReturnType<typeof useAvatarEngine>;
 
-const HUMAN_VRM_PROFILES = [
-  {
-    label: "남성 · 짧은 머리",
-    url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sakurada_Fumiriya.vrm",
-  },
-  {
-    label: "남성 · 긴 머리",
-    url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/HairSample_Male.vrm",
-  },
-  {
-    label: "여성 · 짧은 머리",
-    url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sendagaya_Shino.vrm",
-  },
-  {
-    label: "여성 · 긴 머리",
-    url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Victoria_Rubin.vrm",
-  },
-] as const;
+type ProjectGender = "male" | "female";
+type ProjectJob =
+  | "student"
+  | "teacher"
+  | "doctor"
+  | "police"
+  | "firefighter"
+  | "chef"
+  | "astronaut"
+  | "hacker"
+  | "singer";
 
-const OCCUPATION_STYLES = [
-  { label: "학생", outfit: "#334f82", accent: "#37f2dc" },
-  { label: "우주 비행사", outfit: "#e8edf3", accent: "#3b82f6" },
-  { label: "해커", outfit: "#20203b", accent: "#22d3ee" },
-  { label: "교사", outfit: "#7a5b45", accent: "#e7c98f" },
-  { label: "의사", outfit: "#e7f1ef", accent: "#35b8a0" },
-  { label: "경찰", outfit: "#233d69", accent: "#eab308" },
-  { label: "소방관", outfit: "#9b332d", accent: "#f59e0b" },
-  { label: "요리사", outfit: "#f0ece3", accent: "#dc2626" },
-  { label: "가수", outfit: "#633c89", accent: "#f472b6" },
-] as const;
+const PROJECT_GENDERS: { value: ProjectGender; label: string }[] = [
+  { value: "male", label: "남성형" },
+  { value: "female", label: "여성형" },
+];
+
+const PROJECT_JOBS: {
+  value: ProjectJob;
+  label: string;
+  outfit: string;
+  accent: string;
+}[] = [
+  { value: "student", label: "학생", outfit: "#334f82", accent: "#37f2dc" },
+  { value: "teacher", label: "교사", outfit: "#7a5b45", accent: "#e7c98f" },
+  { value: "doctor", label: "의사", outfit: "#e7f1ef", accent: "#35b8a0" },
+  { value: "police", label: "경찰", outfit: "#233d69", accent: "#eab308" },
+  { value: "firefighter", label: "소방관", outfit: "#9b332d", accent: "#f59e0b" },
+  { value: "chef", label: "요리사", outfit: "#f0ece3", accent: "#dc2626" },
+  { value: "astronaut", label: "우주 비행사", outfit: "#e8edf3", accent: "#3b82f6" },
+  { value: "hacker", label: "해커", outfit: "#20203b", accent: "#22d3ee" },
+  { value: "singer", label: "가수", outfit: "#633c89", accent: "#f472b6" },
+];
+
+const HUMAN_VRM_PROFILES = PROJECT_GENDERS.flatMap((gender) =>
+  PROJECT_JOBS.map((job) => ({
+    gender: gender.value,
+    genderLabel: gender.label,
+    job: job.value,
+    jobLabel: job.label,
+    outfit: job.outfit,
+    accent: job.accent,
+    url: `/avatars/project/${gender.value}-${job.value}.vrm`,
+  })),
+);
 
 const SKIN_COLORS = ["#f7d8bd", "#efc29f", "#c98f67", "#8b5c42"] as const;
-const HAIR_COLORS = ["#2a211f", "#5b3526", "#d0a45c", "#b9bcc8", "#293d66"] as const;
 
 const BACKGROUND_PRESETS = [
   {
@@ -631,6 +645,28 @@ export function ControlPanel({ engine }: { engine: Engine }) {
   const backgroundRef = useRef<HTMLInputElement>(null);
   const objectUrl = useRef<string | null>(null);
   const backgroundObjectUrl = useRef<string | null>(null);
+  const selectedProfile =
+    HUMAN_VRM_PROFILES.find((profile) => profile.url === s.vrmUrl) ??
+    HUMAN_VRM_PROFILES[0];
+
+  const selectProjectAvatar = (
+    gender: ProjectGender,
+    job: ProjectJob,
+    resetJobColors: boolean,
+  ) => {
+    const profile = HUMAN_VRM_PROFILES.find(
+      (candidate) => candidate.gender === gender && candidate.job === job,
+    );
+    if (!profile) return;
+    s.patch({
+      avatarKind: "vrm",
+      vrmUrl: profile.url,
+      vrmName: `${profile.genderLabel} ${profile.jobLabel}`,
+      ...(resetJobColors
+        ? { outfitColor: profile.outfit, accentColor: profile.accent }
+        : {}),
+    });
+  };
 
   const applyVrmFile = (file: File) => {
     if (!file.name.toLowerCase().endsWith(".vrm")) {
@@ -671,96 +707,83 @@ export function ControlPanel({ engine }: { engine: Engine }) {
         전신 인식 · 손 추적 항상 켜짐
       </div>
 
-      <Panel title="사람형 VRM 꾸미기" hint="사람에 가까운 비율의 VRM을 고르고 색과 콘셉트를 바꿔보세요.">
+      <Panel title="사람형 VRM" hint="애니풍 대신 project의 전신 모델을 VRM 1.0으로 변환했습니다.">
         <div>
-          <p className="mb-1.5 text-[12px] text-white/80">캐릭터와 헤어</p>
+          <p className="mb-1.5 text-[12px] text-white/80">기본 인물</p>
           <div className="grid grid-cols-2 gap-2">
-            {HUMAN_VRM_PROFILES.map((profile) => (
+            {PROJECT_GENDERS.map((gender) => (
               <button
-                key={profile.url}
+                key={gender.value}
                 type="button"
                 disabled={engine.avatarLoading}
                 onClick={() =>
-                  s.patch({
-                    avatarKind: "vrm",
-                    vrmUrl: profile.url,
-                    vrmName: `사람형 ${profile.label}`,
-                  })
+                  selectProjectAvatar(gender.value, selectedProfile.job, false)
                 }
-                className={`rounded-xl border px-3 py-2.5 text-left text-[12px] font-medium transition disabled:cursor-wait disabled:opacity-55 ${
-                  s.vrmUrl === profile.url
+                className={`rounded-xl border px-3 py-2.5 text-center text-[12px] font-medium transition disabled:cursor-wait disabled:opacity-55 ${
+                  selectedProfile.gender === gender.value
                     ? "border-indigo-400 bg-indigo-500/25 text-white"
                     : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
                 }`}
               >
-                {profile.label}
-                <span className="mt-0.5 block text-[10px] font-normal text-white/35">
-                  VRM 전신 모델
-                </span>
+                {gender.label}
               </button>
             ))}
           </div>
         </div>
 
         <div>
-          <p className="mb-1.5 text-[12px] text-white/80">직업 콘셉트</p>
+          <p className="mb-1.5 text-[12px] text-white/80">직업</p>
           <div className="flex flex-wrap gap-1.5">
-            {OCCUPATION_STYLES.map((style) => (
-            <button
-              key={style.label}
-              type="button"
-              onClick={() =>
-                s.patch({ outfitColor: style.outfit, accentColor: style.accent })
-              }
-              className={`rounded-full border px-3 py-1.5 text-[12px] font-medium transition ${
-                s.outfitColor === style.outfit && s.accentColor === style.accent
-                  ? "border-white/40 bg-white text-black"
-                  : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
-              }`}
-            >
-              {style.label}
-            </button>
-          ))}
+            {PROJECT_JOBS.map((job) => (
+              <button
+                key={job.value}
+                type="button"
+                disabled={engine.avatarLoading}
+                onClick={() =>
+                  selectProjectAvatar(selectedProfile.gender, job.value, true)
+                }
+                className={`rounded-full border px-3 py-1.5 text-[12px] font-medium transition ${
+                  selectedProfile.job === job.value
+                    ? "border-white/40 bg-white text-black"
+                    : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                }`}
+              >
+                {job.label}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <p className="mb-1.5 text-[12px] text-white/80">피부 색</p>
-            <div className="flex gap-1.5">
-              {SKIN_COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  aria-label={`피부 색 ${color}`}
-                  aria-pressed={s.skinColor === color}
-                  onClick={() => s.set("skinColor", color)}
-                  className={`h-7 flex-1 rounded-lg border-2 ${
-                    s.skinColor === color ? "border-white" : "border-transparent"
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
+        <div>
+          <p className="mb-1.5 text-[12px] text-white/80">피부 색</p>
+          <div className="flex gap-1.5">
+            {SKIN_COLORS.map((color) => (
+              <button
+                key={color}
+                type="button"
+                aria-label={`피부 색 ${color}`}
+                aria-pressed={s.skinColor === color}
+                onClick={() => s.set("skinColor", color)}
+                className={`h-7 flex-1 rounded-lg border-2 ${
+                  s.skinColor === color ? "border-white" : "border-transparent"
+                }`}
+                style={{ backgroundColor: color }}
+              />
+            ))}
           </div>
-          <div>
-            <p className="mb-1.5 text-[12px] text-white/80">머리 색</p>
-            <div className="flex gap-1.5">
-              {HAIR_COLORS.map((color) => (
-                <button
-                  key={color}
-                  type="button"
-                  aria-label={`머리 색 ${color}`}
-                  aria-pressed={s.hairColor === color}
-                  onClick={() => s.set("hairColor", color)}
-                  className={`h-7 flex-1 rounded-lg border-2 ${
-                    s.hairColor === color ? "border-white" : "border-transparent"
-                  }`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
-          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-white/10 bg-black/15 px-3 py-2">
+          <ColorField
+            label="복장"
+            value={s.outfitColor}
+            onChange={(v) => s.set("outfitColor", v)}
+          />
+          <ColorField
+            label="포인트"
+            value={s.accentColor}
+            onChange={(v) => s.set("accentColor", v)}
+          />
         </div>
 
         <p className="rounded-lg bg-black/25 px-3 py-2 text-[11px] text-white/50">
@@ -912,7 +935,7 @@ export function ControlPanel({ engine }: { engine: Engine }) {
               accent: s.accentColor,
             });
             // Blob URLs from a local file pick can't cross window boundaries.
-            if (s.avatarKind === "vrm" && s.vrmUrl?.startsWith("http")) {
+            if (s.avatarKind === "vrm" && s.vrmUrl && !s.vrmUrl.startsWith("blob:")) {
               q.set("vrm", s.vrmUrl);
             }
             window.open(`/embed?${q}`, "avatar-embed", "width=720,height=960");
