@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "VRM 아바타 캡처 스튜디오",
   description:
-    "웹캠으로 스켈레톤을 인식해 전신·얼굴 아바타를 실시간으로 씌우는 브라우저 스튜디오. 영상은 기기 밖으로 나가지 않습니다.",
+    "웹캠 전신·손 움직임을 사람형 VRM 아바타에 실시간으로 반영하고 직접 꾸미는 브라우저 스튜디오. 영상은 기기 밖으로 나가지 않습니다.",
   robots: {
     index: false,
     follow: false,

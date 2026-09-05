@@ -2,7 +2,13 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { VRM, VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm";
 
-import type { AvatarRig, BoneName, ExpressionName, RigMetrics } from "./rig";
+import type {
+  AvatarAppearance,
+  AvatarRig,
+  BoneName,
+  ExpressionName,
+  RigMetrics,
+} from "./rig";
 
 const DEG = 180 / Math.PI;
 
@@ -13,6 +19,20 @@ const EXPRESSION_FALLBACK: Partial<Record<ExpressionName, string>> = {
   ee: "ih",
   oh: "aa",
 };
+
+type AppearanceSlot = keyof AvatarAppearance;
+
+const APPEARANCE_PATTERNS: [AppearanceSlot, RegExp][] = [
+  ["hair", /hair|bang|ponytail|髪|眉|まつげ|eyebrow|eyelash/i],
+  ["skin", /face|skin|body|arm|leg|hand|肌|顔/i],
+  ["accent", /shoe|sock|tie|ribbon|button|accessory|metal|靴|リボン/i],
+  ["outfit", /cloth|outfit|wear|shirt|top|bottom|pants|skirt|dress|coat|jacket|uniform|服|トップス|ボトム/i],
+];
+
+function appearanceSlot(objectName: string, materialName: string): AppearanceSlot | null {
+  const source = `${objectName} ${materialName}`;
+  return APPEARANCE_PATTERNS.find(([, pattern]) => pattern.test(source))?.[0] ?? null;
+}
 
 export async function loadVRMRig(
   url: string,
@@ -33,11 +53,18 @@ export async function loadVRMRig(
   VRMUtils.combineSkeletons(gltf.scene);
   VRMUtils.rotateVRM0(vrm);
 
+  const appearanceMaterials = new Map<THREE.Material, AppearanceSlot>();
+
   vrm.scene.traverse((obj) => {
     if (obj instanceof THREE.Mesh) {
       obj.castShadow = true;
       obj.receiveShadow = true;
       obj.frustumCulled = false;
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+      for (const material of materials) {
+        const slot = appearanceSlot(obj.name, material.name);
+        if (slot) appearanceMaterials.set(material, slot);
+      }
     }
   });
 
@@ -118,6 +145,14 @@ export async function loadVRMRig(
     setGaze(yaw, pitch) {
       gazeYaw = yaw;
       gazePitch = pitch;
+    },
+    setAppearance(appearance) {
+      for (const [material, slot] of appearanceMaterials) {
+        const color = (material as THREE.Material & { color?: THREE.Color }).color;
+        if (!color?.isColor) continue;
+        color.set(appearance[slot]);
+        material.needsUpdate = true;
+      }
     },
     update(delta) {
       if (em) {

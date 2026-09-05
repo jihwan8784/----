@@ -75,6 +75,13 @@ export interface RigMetrics {
   hipY: number;
 }
 
+export interface AvatarAppearance {
+  skin: string;
+  hair: string;
+  outfit: string;
+  accent: string;
+}
+
 export interface AvatarRig {
   /** Object to add to the scene. Its position is the avatar's floor anchor. */
   root: THREE.Object3D;
@@ -86,8 +93,10 @@ export interface AvatarRig {
   setExpression(name: ExpressionName, weight: number): void;
   /** Eye gaze in normalised units, -1..1. */
   setGaze(yaw: number, pitch: number): void;
-  /** Recolour in place, where the avatar supports it (built-in mannequin). */
+  /** Recolour the simple built-in mannequin. */
   setPalette?(body: string, accent: string, skin: string): void;
+  /** Recolour semantic VRM material groups without changing the .vrm rig. */
+  setAppearance?(appearance: AvatarAppearance): void;
   update(delta: number): void;
   dispose(): void;
 }

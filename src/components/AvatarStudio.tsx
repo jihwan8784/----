@@ -11,11 +11,11 @@ import {
 
 import { loadVRMRig } from "@/lib/avatar/vrm";
 import { AvatarViewer } from "@/lib/scene/viewer";
-import type { BackgroundKind, CameraPreset } from "@/lib/scene/viewer";
-import { presetForMode, useSettings } from "@/lib/store";
+import type { BackgroundKind } from "@/lib/scene/viewer";
+import { useSettings } from "@/lib/store";
 import { drawOverlay } from "@/lib/tracking/overlay";
 import { Tracker } from "@/lib/tracking/tracker";
-import type { TrackFrame, TrackerStats, TrackMode } from "@/lib/types";
+import type { TrackFrame, TrackerStats } from "@/lib/types";
 
 // Shared controls
 
@@ -38,36 +38,6 @@ export function Panel({
       </header>
       <div className="space-y-3">{children}</div>
     </section>
-  );
-}
-
-export function Segmented<T extends string>({
-  value,
-  onChange,
-  options,
-}: {
-  value: T;
-  onChange: (v: T) => void;
-  options: { value: T; label: string; icon?: ReactNode }[];
-}) {
-  return (
-    <div className="flex gap-1 rounded-xl bg-black/30 p-1">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-[12px] font-medium transition ${
-            value === o.value
-              ? "bg-indigo-500 text-white shadow-sm shadow-indigo-500/30"
-              : "text-white/55 hover:bg-white/5 hover:text-white/80"
-          }`}
-        >
-          {o.icon}
-          {o.label}
-        </button>
-      ))}
-    </div>
   );
 }
 
@@ -112,44 +82,6 @@ export function Toggle({
           }`}
         />
       </button>
-    </label>
-  );
-}
-
-export function Slider({
-  label,
-  value,
-  min = 0,
-  max = 1,
-  step = 0.01,
-  format,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min?: number;
-  max?: number;
-  step?: number;
-  format?: (v: number) => string;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <label className="block">
-      <span className="mb-1 flex items-center justify-between text-[12px] text-white/80">
-        {label}
-        <span className="tabular-nums text-[11px] text-white/40">
-          {format ? format(value) : value.toFixed(2)}
-        </span>
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/15 accent-indigo-400 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-400"
-      />
     </label>
   );
 }
@@ -285,9 +217,9 @@ export function useAvatarEngine({
   useEffect(() => {
     const tracker = new Tracker(
       {
-        mode: useSettings.getState().mode,
-        quality: useSettings.getState().quality,
-        hands: useSettings.getState().hands,
+        mode: "full",
+        quality: "lite",
+        hands: true,
         mirror: useSettings.getState().mirror,
         showOverlay:
           useSettings.getState().showCamera &&
@@ -331,6 +263,13 @@ export function useAvatarEngine({
             return;
           }
           viewer.setRig(rig);
+          const appearance = useSettings.getState();
+          rig.setAppearance?.({
+            skin: appearance.skinColor,
+            hair: appearance.hairColor,
+            outfit: appearance.outfitColor,
+            accent: appearance.accentColor,
+          });
           setAvatarLabel(rig.name);
           setError(null);
         } catch (e) {
@@ -340,8 +279,8 @@ export function useAvatarEngine({
           );
           useSettings.getState().patch({
             avatarKind: "vrm",
-            vrmUrl: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/stable/AvatarSample_A.vrm",
-            vrmName: "Avatar A",
+            vrmUrl: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sakurada_Fumiriya.vrm",
+            vrmName: "사람형 남성 · 짧은 머리",
           });
         } finally {
           if (!cancelled) {
@@ -354,8 +293,8 @@ export function useAvatarEngine({
 
       useSettings.getState().patch({
         avatarKind: "vrm",
-        vrmUrl: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/stable/AvatarSample_A.vrm",
-        vrmName: "Avatar A",
+        vrmUrl: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sakurada_Fumiriya.vrm",
+        vrmName: "사람형 남성 · 짧은 머리",
       });
     };
 
@@ -368,16 +307,13 @@ export function useAvatarEngine({
   // --- settings -> engine ---------------------------------------------------
   useEffect(() => {
     trackerRef.current?.setOptions({
-      mode: settings.mode,
-      quality: settings.quality,
-      hands: settings.hands,
+      mode: "full",
+      quality: "lite",
+      hands: true,
       mirror: settings.mirror,
       showOverlay: settings.showCamera && settings.showSkeleton,
     });
   }, [
-    settings.mode,
-    settings.quality,
-    settings.hands,
     settings.mirror,
     settings.showCamera,
     settings.showSkeleton,
@@ -389,16 +325,29 @@ export function useAvatarEngine({
       smoothing: settings.smoothing,
       followBody: settings.followBody,
       headGain: settings.headGain,
-      bodyEnabled: settings.mode === "full",
-      fingersEnabled: settings.hands,
+      bodyEnabled: true,
+      fingersEnabled: true,
     });
   }, [
     settings.smoothing,
     settings.followBody,
     settings.headGain,
-    settings.mode,
-    settings.hands,
     avatarLabel,
+  ]);
+
+  useEffect(() => {
+    viewerRef.current?.currentRig?.setAppearance?.({
+      skin: settings.skinColor,
+      hair: settings.hairColor,
+      outfit: settings.outfitColor,
+      accent: settings.accentColor,
+    });
+  }, [
+    avatarLabel,
+    settings.skinColor,
+    settings.hairColor,
+    settings.outfitColor,
+    settings.accentColor,
   ]);
 
   useEffect(() => {
@@ -600,20 +549,39 @@ export function useAvatarEngine({
 
 type Engine = ReturnType<typeof useAvatarEngine>;
 
-const VRM_PRESETS = [
-  { name: "Avatar A", label: "기본 A", group: "기본", accent: "#7c8cff", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/stable/AvatarSample_A.vrm" },
-  { name: "Avatar B", label: "기본 B", group: "기본", accent: "#34d399", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/stable/AvatarSample_B.vrm" },
-  { name: "Avatar C", label: "기본 C", group: "기본", accent: "#fb7185", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/stable/AvatarSample_C.vrm" },
-  { name: "Sakurada Fumiriya", label: "후미리야", group: "남성", accent: "#38bdf8", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sakurada_Fumiriya.vrm" },
-  { name: "Hair Sample Male", label: "헤어 스타일 남성", group: "남성", accent: "#60a5fa", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/HairSample_Male.vrm" },
-  { name: "Sendagaya Shino", label: "시노", group: "여성", accent: "#f472b6", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sendagaya_Shino.vrm" },
-  { name: "Victoria Rubin", label: "빅토리아", group: "여성", accent: "#c084fc", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Victoria_Rubin.vrm" },
-  { name: "Vita", label: "비타", group: "개성", accent: "#f59e0b", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Vita.vrm" },
-  { name: "Vivi", label: "비비", group: "개성", accent: "#22d3ee", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Vivi.vrm" },
-  { name: "Darkness Shibu", label: "다크니스", group: "개성", accent: "#a78bfa", url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Darkness_Shibu.vrm" },
-];
+const HUMAN_VRM_PROFILES = [
+  {
+    label: "남성 · 짧은 머리",
+    url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sakurada_Fumiriya.vrm",
+  },
+  {
+    label: "남성 · 긴 머리",
+    url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/HairSample_Male.vrm",
+  },
+  {
+    label: "여성 · 짧은 머리",
+    url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sendagaya_Shino.vrm",
+  },
+  {
+    label: "여성 · 긴 머리",
+    url: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Victoria_Rubin.vrm",
+  },
+] as const;
 
-const VRM_GROUPS = ["전체", "기본", "남성", "여성", "개성"] as const;
+const OCCUPATION_STYLES = [
+  { label: "학생", outfit: "#334f82", accent: "#37f2dc" },
+  { label: "우주 비행사", outfit: "#e8edf3", accent: "#3b82f6" },
+  { label: "해커", outfit: "#20203b", accent: "#22d3ee" },
+  { label: "교사", outfit: "#7a5b45", accent: "#e7c98f" },
+  { label: "의사", outfit: "#e7f1ef", accent: "#35b8a0" },
+  { label: "경찰", outfit: "#233d69", accent: "#eab308" },
+  { label: "소방관", outfit: "#9b332d", accent: "#f59e0b" },
+  { label: "요리사", outfit: "#f0ece3", accent: "#dc2626" },
+  { label: "가수", outfit: "#633c89", accent: "#f472b6" },
+] as const;
+
+const SKIN_COLORS = ["#f7d8bd", "#efc29f", "#c98f67", "#8b5c42"] as const;
+const HAIR_COLORS = ["#2a211f", "#5b3526", "#d0a45c", "#b9bcc8", "#293d66"] as const;
 
 const BACKGROUND_PRESETS = [
   {
@@ -663,20 +631,6 @@ export function ControlPanel({ engine }: { engine: Engine }) {
   const backgroundRef = useRef<HTMLInputElement>(null);
   const objectUrl = useRef<string | null>(null);
   const backgroundObjectUrl = useRef<string | null>(null);
-  const [vrmInput, setVrmInput] = useState("");
-  const [vrmGroup, setVrmGroup] =
-    useState<(typeof VRM_GROUPS)[number]>("전체");
-  const visiblePresets =
-    vrmGroup === "전체"
-      ? VRM_PRESETS
-      : VRM_PRESETS.filter((preset) => preset.group === vrmGroup);
-  const validVrmUrl = (() => {
-    try {
-      return new URL(vrmInput.trim()).pathname.toLowerCase().endsWith(".vrm");
-    } catch {
-      return false;
-    }
-  })();
 
   const applyVrmFile = (file: File) => {
     if (!file.name.toLowerCase().endsWith(".vrm")) {
@@ -712,121 +666,103 @@ export function ControlPanel({ engine }: { engine: Engine }) {
 
   return (
     <div className="space-y-3">
-      <Panel
-        title="트래킹"
-        hint="행사장에서는 가볍게·손가락 끄기를 권장합니다."
-      >
-        <Segmented
-          value={s.mode}
-          onChange={(mode) =>
-            s.patch({ mode, cameraPreset: presetForMode(mode) })
-          }
-          options={[
-            { value: "full", label: "전신" },
-            { value: "face", label: "얼굴만" },
-          ]}
-        />
-        <Toggle
-          label="거울 모드"
-          hint="내가 든 손이 화면에서도 같은 쪽에 보입니다"
-          checked={s.mirror}
-          onChange={(v) => s.set("mirror", v)}
-        />
-        <Toggle
-          label="손가락 트래킹"
-          hint="정확도가 올라가지만 무거워집니다"
-          checked={s.hands}
-          onChange={(v) => s.set("hands", v)}
-          disabled={s.mode !== "full"}
-        />
-        <div>
-          <p className="mb-1 text-[12px] text-white/80">포즈 모델 정확도</p>
-          <Segmented
-            value={s.quality}
-            onChange={(quality) => s.set("quality", quality)}
-            options={[
-              { value: "lite", label: "가볍게" },
-              { value: "full", label: "정밀하게" },
-            ]}
-          />
-        </div>
-        <Slider
-          label="부드러움"
-          value={s.smoothing}
-          onChange={(v) => s.set("smoothing", v)}
-          format={(v) => `${Math.round(v * 100)}%`}
-        />
-        <Slider
-          label="몸 따라가기"
-          value={s.followBody}
-          onChange={(v) => s.set("followBody", v)}
-          format={(v) => `${Math.round(v * 100)}%`}
-        />
-        <Slider
-          label="고개 반응"
-          value={s.headGain}
-          min={0.5}
-          max={2}
-          onChange={(v) => s.set("headGain", v)}
-          format={(v) => `${v.toFixed(2)}x`}
-        />
-        <Slider
-          label="표정 반응"
-          value={s.expressionGain}
-          min={0.5}
-          max={2.5}
-          onChange={(v) => s.set("expressionGain", v)}
-          format={(v) => `${v.toFixed(2)}x`}
-        />
-      </Panel>
+      <div className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-[11px] text-emerald-100">
+        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+        전신 인식 · 손 추적 항상 켜짐
+      </div>
 
-      <Panel title="VRM 아바타" hint="행사장에서 사용할 아바타를 빠르게 골라보세요.">
-        <div className="flex flex-wrap gap-1.5">
-          {VRM_GROUPS.map((group) => (
+      <Panel title="사람형 VRM 꾸미기" hint="사람에 가까운 비율의 VRM을 고르고 색과 콘셉트를 바꿔보세요.">
+        <div>
+          <p className="mb-1.5 text-[12px] text-white/80">캐릭터와 헤어</p>
+          <div className="grid grid-cols-2 gap-2">
+            {HUMAN_VRM_PROFILES.map((profile) => (
+              <button
+                key={profile.url}
+                type="button"
+                disabled={engine.avatarLoading}
+                onClick={() =>
+                  s.patch({
+                    avatarKind: "vrm",
+                    vrmUrl: profile.url,
+                    vrmName: `사람형 ${profile.label}`,
+                  })
+                }
+                className={`rounded-xl border px-3 py-2.5 text-left text-[12px] font-medium transition disabled:cursor-wait disabled:opacity-55 ${
+                  s.vrmUrl === profile.url
+                    ? "border-indigo-400 bg-indigo-500/25 text-white"
+                    : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                }`}
+              >
+                {profile.label}
+                <span className="mt-0.5 block text-[10px] font-normal text-white/35">
+                  VRM 전신 모델
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-1.5 text-[12px] text-white/80">직업 콘셉트</p>
+          <div className="flex flex-wrap gap-1.5">
+            {OCCUPATION_STYLES.map((style) => (
             <button
-              key={group}
+              key={style.label}
               type="button"
-              onClick={() => setVrmGroup(group)}
+              onClick={() =>
+                s.patch({ outfitColor: style.outfit, accentColor: style.accent })
+              }
               className={`rounded-full border px-3 py-1.5 text-[12px] font-medium transition ${
-                vrmGroup === group
+                s.outfitColor === style.outfit && s.accentColor === style.accent
                   ? "border-white/40 bg-white text-black"
                   : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
               }`}
             >
-              {group}
+              {style.label}
             </button>
           ))}
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          {visiblePresets.map((preset) => (
-            <button
-              key={preset.url}
-              type="button"
-              disabled={engine.avatarLoading}
-              onClick={() =>
-                s.patch({
-                  avatarKind: "vrm",
-                  vrmUrl: preset.url,
-                  vrmName: preset.name,
-                })
-              }
-              className={`relative overflow-hidden rounded-xl border px-3 py-3 text-left transition disabled:cursor-wait disabled:opacity-55 ${
-                s.vrmUrl === preset.url
-                  ? "border-indigo-400 bg-indigo-500/25 text-white"
-                  : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
-              }`}
-            >
-              <span
-                className="absolute inset-y-0 left-0 w-1"
-                style={{ backgroundColor: preset.accent }}
-              />
-              <span className="block text-[13px] font-semibold">{preset.label}</span>
-              <span className="mt-0.5 block text-[11px] text-white/40">
-                {preset.group} · VRM
-              </span>
-            </button>
-          ))}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="mb-1.5 text-[12px] text-white/80">피부 색</p>
+            <div className="flex gap-1.5">
+              {SKIN_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  aria-label={`피부 색 ${color}`}
+                  aria-pressed={s.skinColor === color}
+                  onClick={() => s.set("skinColor", color)}
+                  className={`h-7 flex-1 rounded-lg border-2 ${
+                    s.skinColor === color ? "border-white" : "border-transparent"
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1.5 text-[12px] text-white/80">머리 색</p>
+            <div className="flex gap-1.5">
+              {HAIR_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  aria-label={`머리 색 ${color}`}
+                  aria-pressed={s.hairColor === color}
+                  onClick={() => s.set("hairColor", color)}
+                  className={`h-7 flex-1 rounded-lg border-2 ${
+                    s.hairColor === color ? "border-white" : "border-transparent"
+                  }`}
+                  style={{ backgroundColor: color }}
+                />
+              ))}
+            </div>
+          </div>
         </div>
+
         <p className="rounded-lg bg-black/25 px-3 py-2 text-[11px] text-white/50">
           {engine.avatarLoading
             ? "아바타를 불러오는 중…"
@@ -844,44 +780,24 @@ export function ControlPanel({ engine }: { engine: Engine }) {
             e.target.value = "";
           }}
         />
-        <Button full onClick={() => fileRef.current?.click()}>
-          내 VRM 파일 올리기…
-        </Button>
-        <div className="flex gap-1.5">
-          <input
-            value={vrmInput}
-            onChange={(e) => setVrmInput(e.target.value)}
-            placeholder="또는 VRM 주소 붙여넣기"
-            className="min-w-0 flex-1 rounded-xl bg-black/30 px-3 py-2 text-[12px] text-white/80 outline-none placeholder:text-white/25 focus:ring-1 focus:ring-indigo-400"
-          />
-          <Button
-            disabled={!validVrmUrl}
-            onClick={() =>
-              s.patch({
-                avatarKind: "vrm",
-                vrmUrl: vrmInput.trim(),
-                vrmName: vrmInput.trim().split("/").pop() ?? "VRM",
-              })
-            }
-          >
-            적용
-          </Button>
-        </div>
+        <details className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+          <summary className="cursor-pointer text-[11px] text-white/55">
+            내 VRM 파일 사용
+          </summary>
+          <div className="mt-2">
+            <Button full onClick={() => fileRef.current?.click()}>
+              VRM 파일 선택…
+            </Button>
+          </div>
+        </details>
       </Panel>
 
-      <Panel title="화면">
-        <div>
-          <p className="mb-1 text-[12px] text-white/80">카메라 앵글</p>
-          <Segmented
-            value={s.cameraPreset}
-            onChange={(v) => s.set("cameraPreset", v)}
-            options={[
-              { value: "full", label: "전신" },
-              { value: "upper", label: "상반신" },
-              { value: "face", label: "얼굴" },
-            ]}
-          />
-        </div>
+      <Panel title="화면" hint="전신 구도는 고정됩니다.">
+        <Toggle
+          label="거울 보기"
+          checked={s.mirror}
+          onChange={(v) => s.set("mirror", v)}
+        />
         <Toggle
           label="웹캠 미리보기"
           hint="숨겨도 아바타 움직임 추적은 계속됩니다"
@@ -988,11 +904,12 @@ export function ControlPanel({ engine }: { engine: Engine }) {
           full
           onClick={() => {
             const q = new URLSearchParams({
-              mode: s.mode,
               mirror: s.mirror ? "1" : "0",
-              hands: s.hands ? "1" : "0",
-              preset: s.cameraPreset,
               bg: "transparent",
+              skin: s.skinColor,
+              hair: s.hairColor,
+              outfit: s.outfitColor,
+              accent: s.accentColor,
             });
             // Blob URLs from a local file pick can't cross window boundaries.
             if (s.avatarKind === "vrm" && s.vrmUrl?.startsWith("http")) {
@@ -1231,12 +1148,16 @@ export function EmbedStage() {
   useEffect(() => {
     const bg = (params.get("bg") as BackgroundKind) ?? "transparent";
     useSettings.getState().patch({
-      mode: (params.get("mode") as TrackMode) ?? "full",
+      mode: "full",
       mirror: params.get("mirror") !== "0",
-      hands: params.get("hands") === "1",
-      cameraPreset: (params.get("preset") as CameraPreset) ?? "full",
+      hands: true,
+      cameraPreset: "full",
       background: bg,
       chroma: params.get("chroma") ?? "#00b140",
+      skinColor: params.get("skin") ?? "#efc29f",
+      hairColor: params.get("hair") ?? "#2a211f",
+      outfitColor: params.get("outfit") ?? "#334f82",
+      accentColor: params.get("accent") ?? "#37f2dc",
       showCamera: false,
       showSkeleton: false,
       ...(params.get("vrm")

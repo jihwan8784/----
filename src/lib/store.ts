@@ -16,6 +16,10 @@ export interface Settings {
   vrmUrl: string | null;
   vrmName: string | null;
   mannequin: MannequinOptions;
+  skinColor: string;
+  hairColor: string;
+  outfitColor: string;
+  accentColor: string;
 
   smoothing: number;
   followBody: number;
@@ -39,13 +43,17 @@ interface Store extends Settings {
 const initial: Settings = {
   mode: "full",
   quality: "lite",
-  hands: false,
+  hands: true,
   mirror: true,
 
   avatarKind: "vrm",
-  vrmUrl: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/stable/AvatarSample_A.vrm",
-  vrmName: "Avatar A",
+  vrmUrl: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sakurada_Fumiriya.vrm",
+  vrmName: "사람형 남성 · 짧은 머리",
   mannequin: DEFAULT_MANNEQUIN,
+  skinColor: "#efc29f",
+  hairColor: "#2a211f",
+  outfitColor: "#334f82",
+  accentColor: "#37f2dc",
 
   smoothing: 0.45,
   followBody: 0.5,
