@@ -61,8 +61,8 @@ jobs:
           xvfb-run -a blender -b --python scripts/render_glb_preview.py -- \
             /tmp/rocketbox/firefighter/firefighter.glb \
             /tmp/rocketbox/firefighter/preview
-          test -s /tmp/rocketbox/firefighter/preview/plus-z.png
-          test -s /tmp/rocketbox/firefighter/preview/minus-z.png
+          test -s /tmp/rocketbox/firefighter/preview/plus-y.png
+          test -s /tmp/rocketbox/firefighter/preview/minus-y.png
 
       - name: Wrap as VRM 1.0
         run: |
