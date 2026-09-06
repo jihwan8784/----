@@ -1,0 +1,54 @@
+name: Remove unused solver helper
+
+on:
+  push:
+    branches:
+      - repository-cleanup-20260907
+    paths:
+      - .github/workflows/remove-unused-solver-helper.yml
+
+permissions:
+  contents: write
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Remove unused orthoBasis helper
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/lib/avatar/solver.ts')
+          text = p.read_text()
+          block = '''\n/** Orthonormal frame whose first axis is `primary` and second is near `hint`. */\nfunction orthoBasis(\n  primary: THREE.Vector3,\n  hint: THREE.Vector3,\n): THREE.Quaternion | null {\n  const x = primary.clone().normalize();\n  const z = new THREE.Vector3().crossVectors(x, hint);\n  if (z.lengthSq() < 1e-8) return null;\n  z.normalize();\n  const y = new THREE.Vector3().crossVectors(z, x).normalize();\n  return new THREE.Quaternion().setFromRotationMatrix(\n    new THREE.Matrix4().makeBasis(x, y, z),\n  );\n}\n'''
+          if text.count(block) != 1:
+              raise SystemExit('Expected exactly one unused orthoBasis helper')
+          p.write_text(text.replace(block, '\n'))
+          PY
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run validation
+        run: |
+          npm run check:tracking
+          npm run check:avatars
+          npm run lint -- --max-warnings=0
+          npm run build
+
+      - name: Commit solver cleanup
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/lib/avatar/solver.ts
+          git commit -m 'Remove unused solver helper'
+          git push origin HEAD:repository-cleanup-20260907
