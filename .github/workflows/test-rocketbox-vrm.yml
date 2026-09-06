@@ -25,7 +25,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y blender python3-numpy
+          sudo apt-get install -y blender python3-numpy xvfb libegl1 libgl1-mesa-dri
           blender --version | head -n 2
 
       - name: Download Rocketbox firefighter source
@@ -58,7 +58,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/rocketbox/firefighter/preview
-          blender -b --python scripts/render_glb_preview.py -- \
+          xvfb-run -a blender -b --python scripts/render_glb_preview.py -- \
             /tmp/rocketbox/firefighter/firefighter.glb \
             /tmp/rocketbox/firefighter/preview
           test -s /tmp/rocketbox/firefighter/preview/plus-z.png
@@ -73,7 +73,7 @@ jobs:
             'Rocketbox Female Firefighter'
           test -s /tmp/rocketbox/firefighter/female-firefighter.vrm
 
-      - name: Validate VRM structure and scale
+      - name: Validate VRM structure, scale, and expression capability
         run: |
           python - <<'PY'
           import json, struct
@@ -127,11 +127,15 @@ jobs:
           raw_height = max(v[1] for _, v in positions) - min(v[1] for v, _ in positions)
           assert 1.4 <= raw_height <= 2.2, f'unexpected mesh height: {raw_height}'
 
+          target_counts = [len(pr.get('targets', [])) for pr in primitives]
+          target_names = [mesh.get('extras', {}).get('targetNames', []) for mesh in doc.get('meshes', [])]
           print('VRM OK')
           print('size_mb', round(p.stat().st_size / 1024 / 1024, 2))
           print('raw_height_m', round(raw_height, 3), 'inherited_scale', inherited)
           print('nodes', len(doc.get('nodes', [])), 'meshes', len(doc.get('meshes', [])), 'materials', len(doc.get('materials', [])))
           print('images', len(doc.get('images', [])), 'skins', len(doc.get('skins', [])))
+          print('morph_target_counts', target_counts)
+          print('morph_target_names', target_names)
           PY
 
       - name: Upload converted VRM and previews
