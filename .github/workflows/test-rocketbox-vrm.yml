@@ -1,0 +1,97 @@
+name: Test Rocketbox VRM conversion
+
+on:
+  push:
+    branches:
+      - occupation-avatar-upgrade-20260907
+    paths:
+      - .github/workflows/test-rocketbox-vrm.yml
+      - scripts/rocketbox_to_glb.py
+      - scripts/wrap_humanoid_vrm.mjs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  convert-firefighter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+          blender --version | head -n 2
+
+      - name: Download Rocketbox firefighter source
+        run: |
+          set -euo pipefail
+          ROOT='https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Professions/Fire_Female_01'
+          mkdir -p /tmp/rocketbox/firefighter/textures
+          curl -fL --retry 3 "$ROOT/Export/Fire_Female_01.fbx" -o /tmp/rocketbox/firefighter/Fire_Female_01.fbx
+          for file in \
+            m131_body_color.tga \
+            m131_flashlight_color.tga \
+            m131_head_color.tga \
+            m131_helmet_color.tga \
+            m131_mask_color.tga \
+            m131_opacity_color.tga; do
+            curl -fL --retry 3 "$ROOT/Textures/$file" -o "/tmp/rocketbox/firefighter/textures/$file"
+          done
+          cp /tmp/rocketbox/firefighter/textures/* /tmp/rocketbox/firefighter/
+
+      - name: Convert FBX to skinned GLB
+        run: |
+          blender -b --python scripts/rocketbox_to_glb.py -- \
+            /tmp/rocketbox/firefighter/Fire_Female_01.fbx \
+            /tmp/rocketbox/firefighter/firefighter.glb \
+            /tmp/rocketbox/firefighter/textures
+
+      - name: Wrap as VRM 1.0
+        run: |
+          node scripts/wrap_humanoid_vrm.mjs \
+            /tmp/rocketbox/firefighter/firefighter.glb \
+            /tmp/rocketbox/firefighter/female-firefighter.vrm \
+            'Rocketbox Female Firefighter'
+
+      - name: Validate VRM structure
+        run: |
+          python - <<'PY'
+          import json, struct
+          from pathlib import Path
+
+          p = Path('/tmp/rocketbox/firefighter/female-firefighter.vrm')
+          data = p.read_bytes()
+          assert data[:4] == b'glTF' and struct.unpack_from('<I', data, 4)[0] == 2
+          json_len, json_type = struct.unpack_from('<II', data, 12)
+          assert json_type == 0x4E4F534A
+          doc = json.loads(data[20:20+json_len].decode('utf-8').rstrip(' \x00'))
+          vrm = doc['extensions']['VRMC_vrm']
+          bones = vrm['humanoid']['humanBones']
+          required = {
+              'hips','spine','chest','neck','head',
+              'leftShoulder','leftUpperArm','leftLowerArm','leftHand',
+              'rightShoulder','rightUpperArm','rightLowerArm','rightHand',
+              'leftUpperLeg','leftLowerLeg','leftFoot',
+              'rightUpperLeg','rightLowerLeg','rightFoot'
+          }
+          assert required <= set(bones), sorted(required - set(bones))
+          assert doc.get('skins'), 'no skin found'
+          assert doc.get('materials'), 'no materials found'
+          primitives = [pr for mesh in doc.get('meshes', []) for pr in mesh.get('primitives', [])]
+          assert primitives, 'no mesh primitives'
+          assert any('JOINTS_0' in pr.get('attributes', {}) and 'WEIGHTS_0' in pr.get('attributes', {}) for pr in primitives), 'no skinned mesh attributes'
+          print('VRM OK')
+          print('size_mb', round(p.stat().st_size / 1024 / 1024, 2))
+          print('nodes', len(doc.get('nodes', [])), 'meshes', len(doc.get('meshes', [])), 'materials', len(doc.get('materials', [])))
+          print('images', len(doc.get('images', [])), 'skins', len(doc.get('skins', [])))
+          PY
+
+      - name: Upload converted VRM
+        uses: actions/upload-artifact@v4
+        with:
+          name: rocketbox-firefighter-vrm
+          path: /tmp/rocketbox/firefighter/female-firefighter.vrm
