@@ -20,6 +20,9 @@ jobs:
       - name: Apply cleanup
         run: python scripts/repository-cleanup.py
 
+      - name: Keep workflow files unchanged for the bot push
+        run: git checkout HEAD -- .github/workflows/ci.yml .github/workflows/repository-cleanup.yml
+
       - name: Use Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -41,8 +44,8 @@ jobs:
       - name: Production build
         run: npm run build
 
-      - name: Remove one-time cleanup files
-        run: git rm scripts/repository-cleanup.py .github/workflows/repository-cleanup.yml
+      - name: Remove one-time cleanup script
+        run: git rm scripts/repository-cleanup.py
 
       - name: Commit cleanup
         run: |
@@ -52,5 +55,3 @@ jobs:
           git add -A
           git commit -m 'Clean up Avatar Studio files and names'
           git push origin HEAD:repository-cleanup-20260907
-
-# Retry after updating the renamed MediaPipe helper message.
