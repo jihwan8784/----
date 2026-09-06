@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/test-rocketbox-vrm.yml
       - scripts/rocketbox_to_glb.py
+      - scripts/render_glb_preview.py
       - scripts/wrap_humanoid_vrm.mjs
   workflow_dispatch:
 
@@ -53,6 +54,16 @@ jobs:
             /tmp/rocketbox/firefighter/textures
           test -s /tmp/rocketbox/firefighter/firefighter.glb
 
+      - name: Render conversion preview
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/rocketbox/firefighter/preview
+          blender -b --python scripts/render_glb_preview.py -- \
+            /tmp/rocketbox/firefighter/firefighter.glb \
+            /tmp/rocketbox/firefighter/preview
+          test -s /tmp/rocketbox/firefighter/preview/plus-z.png
+          test -s /tmp/rocketbox/firefighter/preview/minus-z.png
+
       - name: Wrap as VRM 1.0
         run: |
           set -euo pipefail
@@ -62,7 +73,7 @@ jobs:
             'Rocketbox Female Firefighter'
           test -s /tmp/rocketbox/firefighter/female-firefighter.vrm
 
-      - name: Validate VRM structure
+      - name: Validate VRM structure and scale
         run: |
           python - <<'PY'
           import json, struct
@@ -89,14 +100,44 @@ jobs:
           primitives = [pr for mesh in doc.get('meshes', []) for pr in mesh.get('primitives', [])]
           assert primitives, 'no mesh primitives'
           assert any('JOINTS_0' in pr.get('attributes', {}) and 'WEIGHTS_0' in pr.get('attributes', {}) for pr in primitives), 'no skinned mesh attributes'
+
+          mesh_nodes = [i for i, node in enumerate(doc.get('nodes', [])) if 'mesh' in node]
+          parents = {}
+          for parent, node in enumerate(doc.get('nodes', [])):
+              for child in node.get('children', []):
+                  parents[child] = parent
+          def inherited_uniform_scale(node_index):
+              scale = 1.0
+              current = node_index
+              while True:
+                  node = doc['nodes'][current]
+                  values = node.get('scale', [1, 1, 1])
+                  scale *= sum(abs(v) for v in values) / 3
+                  if current not in parents:
+                      return scale
+                  current = parents[current]
+          inherited = [inherited_uniform_scale(i) for i in mesh_nodes]
+          assert inherited and min(inherited) > 0.5, f'avatar still has FBX unit shrink: {inherited}'
+
+          positions = []
+          for pr in primitives:
+              accessor = doc['accessors'][pr['attributes']['POSITION']]
+              if 'min' in accessor and 'max' in accessor:
+                  positions.append((accessor['min'], accessor['max']))
+          raw_height = max(v[1] for _, v in positions) - min(v[1] for v, _ in positions)
+          assert 1.4 <= raw_height <= 2.2, f'unexpected mesh height: {raw_height}'
+
           print('VRM OK')
           print('size_mb', round(p.stat().st_size / 1024 / 1024, 2))
+          print('raw_height_m', round(raw_height, 3), 'inherited_scale', inherited)
           print('nodes', len(doc.get('nodes', [])), 'meshes', len(doc.get('meshes', [])), 'materials', len(doc.get('materials', [])))
           print('images', len(doc.get('images', [])), 'skins', len(doc.get('skins', [])))
           PY
 
-      - name: Upload converted VRM
+      - name: Upload converted VRM and previews
         uses: actions/upload-artifact@v4
         with:
-          name: rocketbox-firefighter-vrm
-          path: /tmp/rocketbox/firefighter/female-firefighter.vrm
+          name: rocketbox-firefighter-vrm-preview
+          path: |
+            /tmp/rocketbox/firefighter/female-firefighter.vrm
+            /tmp/rocketbox/firefighter/preview/*.png
