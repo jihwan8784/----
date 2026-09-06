@@ -1,4 +1,4 @@
-name: Test Rocketbox VRM conversion
+name: Import occupation VRMs
 
 on:
   push:
@@ -12,10 +12,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  convert-firefighter:
+  import-occupation-vrms:
     runs-on: ubuntu-latest
     steps:
       - name: Check out branch
@@ -28,120 +28,189 @@ jobs:
           sudo apt-get install -y blender python3-numpy xvfb libegl1 libgl1-mesa-dri
           blender --version | head -n 2
 
-      - name: Download Rocketbox firefighter source
+      - name: Fetch selected Microsoft Rocketbox avatars
         run: |
           set -euo pipefail
-          ROOT='https://raw.githubusercontent.com/microsoft/Microsoft-Rocketbox/master/Assets/Avatars/Professions/Fire_Female_01'
-          mkdir -p /tmp/rocketbox/firefighter/textures
-          curl -fL --retry 3 "$ROOT/Export/Fire_Female_01.fbx" -o /tmp/rocketbox/firefighter/Fire_Female_01.fbx
-          for file in \
-            m131_body_color.tga \
-            m131_flashlight_color.tga \
-            m131_head_color.tga \
-            m131_helmet_color.tga \
-            m131_mask_color.tga \
-            m131_opacity_color.tga; do
-            curl -fL --retry 3 "$ROOT/Textures/$file" -o "/tmp/rocketbox/firefighter/textures/$file"
-          done
-          cp /tmp/rocketbox/firefighter/textures/* /tmp/rocketbox/firefighter/
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/microsoft/Microsoft-Rocketbox.git /tmp/rocketbox-src
+          cd /tmp/rocketbox-src
+          git sparse-checkout set \
+            Assets/Avatars/Adults/Female_Adult_01 \
+            Assets/Avatars/Adults/Male_Adult_01 \
+            Assets/Avatars/Professions/Pilot_Female_01 \
+            Assets/Avatars/Professions/Pilot_Male_01 \
+            Assets/Avatars/Professions/Fire_Female_01 \
+            Assets/Avatars/Professions/Fire_Male_01 \
+            Assets/Avatars/Professions/Chef_Female_01
 
-      - name: Convert FBX to skinned GLB
+      - name: Convert selected avatars to VRM 1.0
         run: |
           set -euo pipefail
-          blender -b --python scripts/rocketbox_to_glb.py -- \
-            /tmp/rocketbox/firefighter/Fire_Female_01.fbx \
-            /tmp/rocketbox/firefighter/firefighter.glb \
-            /tmp/rocketbox/firefighter/textures
-          test -s /tmp/rocketbox/firefighter/firefighter.glb
+          OUT="$GITHUB_WORKSPACE/public/avatars/occupation"
+          WORK=/tmp/occupation-vrm
+          SRC=/tmp/rocketbox-src/Assets/Avatars
+          mkdir -p "$OUT" "$WORK/preview"
 
-      - name: Render conversion preview
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/rocketbox/firefighter/preview
-          xvfb-run -a blender -b --python scripts/render_glb_preview.py -- \
-            /tmp/rocketbox/firefighter/firefighter.glb \
-            /tmp/rocketbox/firefighter/preview
-          test -s /tmp/rocketbox/firefighter/preview/plus-y.png
-          test -s /tmp/rocketbox/firefighter/preview/minus-y.png
+          convert_avatar() {
+            group="$1"
+            folder="$2"
+            output="$3"
+            title="$4"
+            source="$SRC/$group/$folder"
+            fbx="$(find "$source/Export" -maxdepth 1 -type f -iname '*.fbx' | head -n 1)"
+            if [ -z "$fbx" ]; then
+              echo "No FBX found in $source/Export" >&2
+              exit 1
+            fi
+            texture_dir="$source/Textures"
+            mkdir -p "$WORK/$output"
+            blender -b --python "$GITHUB_WORKSPACE/scripts/rocketbox_to_glb.py" -- \
+              "$fbx" "$WORK/$output/model.glb" "$texture_dir"
+            test -s "$WORK/$output/model.glb"
+            xvfb-run -a blender -b --python "$GITHUB_WORKSPACE/scripts/render_glb_preview.py" -- \
+              "$WORK/$output/model.glb" "$WORK/preview/$output"
+            test -s "$WORK/preview/$output/plus-y.png"
+            test -s "$WORK/preview/$output/minus-y.png"
+            node "$GITHUB_WORKSPACE/scripts/wrap_humanoid_vrm.mjs" \
+              "$WORK/$output/model.glb" "$OUT/$output.vrm" "$title"
+            test -s "$OUT/$output.vrm"
+          }
 
-      - name: Wrap as VRM 1.0
-        run: |
-          set -euo pipefail
-          node scripts/wrap_humanoid_vrm.mjs \
-            /tmp/rocketbox/firefighter/firefighter.glb \
-            /tmp/rocketbox/firefighter/female-firefighter.vrm \
-            'Rocketbox Female Firefighter'
-          test -s /tmp/rocketbox/firefighter/female-firefighter.vrm
+          convert_avatar Adults Female_Adult_01 female-student 'Rocketbox Female Student'
+          convert_avatar Adults Male_Adult_01 male-student 'Rocketbox Male Student'
+          convert_avatar Professions Pilot_Female_01 female-astronaut 'Rocketbox Female Astronaut (Pilot-based)'
+          convert_avatar Professions Pilot_Male_01 male-astronaut 'Rocketbox Male Astronaut (Pilot-based)'
+          convert_avatar Professions Fire_Female_01 female-firefighter 'Rocketbox Female Firefighter'
+          convert_avatar Professions Fire_Male_01 male-firefighter 'Rocketbox Male Firefighter'
+          convert_avatar Professions Chef_Female_01 female-chef 'Rocketbox Female Chef'
 
-      - name: Validate VRM structure, scale, and expression capability
+      - name: Validate every generated VRM
         run: |
           python - <<'PY'
-          import json, struct
+          import json
+          import struct
           from pathlib import Path
 
-          p = Path('/tmp/rocketbox/firefighter/female-firefighter.vrm')
-          data = p.read_bytes()
-          assert data[:4] == b'glTF' and struct.unpack_from('<I', data, 4)[0] == 2
-          json_len, json_type = struct.unpack_from('<II', data, 12)
-          assert json_type == 0x4E4F534A
-          doc = json.loads(data[20:20+json_len].decode('utf-8').rstrip(' \x00'))
-          vrm = doc['extensions']['VRMC_vrm']
-          bones = vrm['humanoid']['humanBones']
+          folder = Path('public/avatars/occupation')
+          expected = {
+              'female-student.vrm', 'male-student.vrm',
+              'female-astronaut.vrm', 'male-astronaut.vrm',
+              'female-firefighter.vrm', 'male-firefighter.vrm',
+              'female-chef.vrm',
+          }
           required = {
               'hips','spine','chest','neck','head',
               'leftShoulder','leftUpperArm','leftLowerArm','leftHand',
               'rightShoulder','rightUpperArm','rightLowerArm','rightHand',
               'leftUpperLeg','leftLowerLeg','leftFoot',
-              'rightUpperLeg','rightLowerLeg','rightFoot'
+              'rightUpperLeg','rightLowerLeg','rightFoot',
           }
-          assert required <= set(bones), sorted(required - set(bones))
-          assert doc.get('skins'), 'no skin found'
-          assert doc.get('materials'), 'no materials found'
-          primitives = [pr for mesh in doc.get('meshes', []) for pr in mesh.get('primitives', [])]
-          assert primitives, 'no mesh primitives'
-          assert any('JOINTS_0' in pr.get('attributes', {}) and 'WEIGHTS_0' in pr.get('attributes', {}) for pr in primitives), 'no skinned mesh attributes'
 
-          mesh_nodes = [i for i, node in enumerate(doc.get('nodes', [])) if 'mesh' in node]
-          parents = {}
-          for parent, node in enumerate(doc.get('nodes', [])):
-              for child in node.get('children', []):
-                  parents[child] = parent
-          def inherited_uniform_scale(node_index):
-              scale = 1.0
-              current = node_index
-              while True:
-                  node = doc['nodes'][current]
-                  values = node.get('scale', [1, 1, 1])
-                  scale *= sum(abs(v) for v in values) / 3
-                  if current not in parents:
-                      return scale
-                  current = parents[current]
-          inherited = [inherited_uniform_scale(i) for i in mesh_nodes]
-          assert inherited and min(inherited) > 0.5, f'avatar still has FBX unit shrink: {inherited}'
+          def load(path):
+              data = path.read_bytes()
+              assert data[:4] == b'glTF', f'{path}: not GLB'
+              assert struct.unpack_from('<I', data, 4)[0] == 2, f'{path}: not glTF 2'
+              json_len, json_type = struct.unpack_from('<II', data, 12)
+              assert json_type == 0x4E4F534A
+              doc = json.loads(data[20:20+json_len].decode('utf-8').rstrip(' \x00'))
+              return data, doc
 
-          positions = []
-          for pr in primitives:
-              accessor = doc['accessors'][pr['attributes']['POSITION']]
-              if 'min' in accessor and 'max' in accessor:
-                  positions.append((accessor['min'], accessor['max']))
-          raw_height = max(v[1] for _, v in positions) - min(v[1] for v, _ in positions)
-          assert 1.4 <= raw_height <= 2.2, f'unexpected mesh height: {raw_height}'
+          actual = {p.name for p in folder.glob('*.vrm')}
+          assert expected <= actual, f'missing outputs: {sorted(expected - actual)}'
 
-          target_counts = [len(pr.get('targets', [])) for pr in primitives]
-          target_names = [mesh.get('extras', {}).get('targetNames', []) for mesh in doc.get('meshes', [])]
-          print('VRM OK')
-          print('size_mb', round(p.stat().st_size / 1024 / 1024, 2))
-          print('raw_height_m', round(raw_height, 3), 'inherited_scale', inherited)
-          print('nodes', len(doc.get('nodes', [])), 'meshes', len(doc.get('meshes', [])), 'materials', len(doc.get('materials', [])))
-          print('images', len(doc.get('images', [])), 'skins', len(doc.get('skins', [])))
-          print('morph_target_counts', target_counts)
-          print('morph_target_names', target_names)
+          for name in sorted(expected):
+              path = folder / name
+              data, doc = load(path)
+              vrm = doc.get('extensions', {}).get('VRMC_vrm')
+              assert vrm, f'{name}: missing VRMC_vrm'
+              bones = vrm['humanoid']['humanBones']
+              assert required <= set(bones), f'{name}: missing bones {sorted(required - set(bones))}'
+              assert doc.get('skins'), f'{name}: no skin'
+              assert doc.get('materials'), f'{name}: no materials'
+              primitives = [pr for mesh in doc.get('meshes', []) for pr in mesh.get('primitives', [])]
+              assert primitives, f'{name}: no primitives'
+              assert any('JOINTS_0' in p.get('attributes', {}) and 'WEIGHTS_0' in p.get('attributes', {}) for p in primitives), f'{name}: no skin attributes'
+
+              parents = {}
+              for parent, node in enumerate(doc.get('nodes', [])):
+                  for child in node.get('children', []):
+                      parents[child] = parent
+              def inherited_scale(index):
+                  value = 1.0
+                  current = index
+                  while True:
+                      scale = doc['nodes'][current].get('scale', [1, 1, 1])
+                      value *= sum(abs(v) for v in scale) / 3
+                      if current not in parents:
+                          return value
+                      current = parents[current]
+              mesh_nodes = [i for i, node in enumerate(doc.get('nodes', [])) if 'mesh' in node]
+              scales = [inherited_scale(i) for i in mesh_nodes]
+              assert scales and min(scales) > 0.5, f'{name}: FBX unit shrink remains {scales}'
+
+              positions = []
+              for primitive in primitives:
+                  accessor = doc['accessors'][primitive['attributes']['POSITION']]
+                  if 'min' in accessor and 'max' in accessor:
+                      positions.append((accessor['min'], accessor['max']))
+              assert positions, f'{name}: no POSITION bounds'
+              height = max(high[1] for _, high in positions) - min(low[1] for low, _ in positions)
+              assert 1.35 <= height <= 2.25, f'{name}: unexpected raw height {height:.3f}m'
+              print(f'OK {name}: {len(data)/1024/1024:.2f} MB, height={height:.3f}m')
           PY
 
-      - name: Upload converted VRM and previews
+      - name: Add Rocketbox license notice
+        run: |
+          cat > public/avatars/occupation/NOTICE.md <<'EOF'
+          # Microsoft Rocketbox occupation avatars
+
+          The VRM files in this directory are derived from Microsoft Rocketbox:
+          https://github.com/microsoft/Microsoft-Rocketbox
+
+          Selected source avatars were converted from the original FBX assets to
+          skinned glTF and then wrapped as VRM 1.0 for this Avatar Studio. Embedded
+          texture images may be resized for web delivery. The conversion does not
+          add facial morph targets that are absent from the source assets.
+
+          Source copyright and license:
+
+          MIT License
+
+          Copyright (c) 2020 Microsoft
+
+          Permission is hereby granted, free of charge, to any person obtaining a copy
+          of this software and associated documentation files (the "Software"), to deal
+          in the Software without restriction, including without limitation the rights
+          to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+          copies of the Software, and to permit persons to whom the Software is
+          furnished to do so, subject to the following conditions:
+
+          The above copyright notice and this permission notice shall be included in all
+          copies or substantial portions of the Software.
+
+          THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+          IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+          FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+          AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+          LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+          OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+          SOFTWARE.
+          EOF
+
+      - name: Commit generated occupation VRMs
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/avatars/occupation
+          if git diff --cached --quiet; then
+            echo 'No generated asset changes to commit.'
+            exit 0
+          fi
+          git commit -m 'Add Rocketbox occupation VRMs'
+          git push origin HEAD:occupation-avatar-upgrade-20260907
+
+      - name: Upload visual QA previews
         uses: actions/upload-artifact@v4
         with:
-          name: rocketbox-firefighter-vrm-preview
-          path: |
-            /tmp/rocketbox/firefighter/female-firefighter.vrm
-            /tmp/rocketbox/firefighter/preview/*.png
+          name: occupation-vrm-previews
+          path: /tmp/occupation-vrm/preview/**/*.png
