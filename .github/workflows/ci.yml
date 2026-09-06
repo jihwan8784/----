@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - qa-hardening-20260907
+      - occupation-avatar-upgrade-20260907
   pull_request:
 
 permissions:
@@ -26,8 +26,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check tracking rig
+      - name: Check tracking rig and wrist regression
         run: npm run check:rig
+
+      - name: Validate bundled VRM assets
+        run: npm run check:assets
 
       - name: Lint
         run: npm run lint
