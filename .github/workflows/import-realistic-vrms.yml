@@ -1,0 +1,79 @@
+name: Import realistic VRMs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/import-realistic-vrms.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-vrms:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install optimizer dependency
+        run: python -m pip install --disable-pip-version-check pillow
+
+      - name: Download clearly licensed realistic VRMs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp-vrm public/avatars/realistic
+          base='https://media.githubusercontent.com/media/TLTMedia/valid-vrm-avatars/master/Asian'
+          curl --fail --location --retry 3 "$base/Asian_M_1_Casual.vrm" -o .tmp-vrm/male-casual.vrm
+          curl --fail --location --retry 3 "$base/Asian_M_1_Busi.vrm" -o .tmp-vrm/male-business.vrm
+          curl --fail --location --retry 3 "$base/Asian_M_1_Medi.vrm" -o .tmp-vrm/male-medical.vrm
+          curl --fail --location --retry 3 "$base/Asian_M_1_Util.vrm" -o .tmp-vrm/male-utility.vrm
+          curl --fail --location --retry 3 "$base/Asian_F_1_Casual.vrm" -o .tmp-vrm/female-casual.vrm
+          curl --fail --location --retry 3 "$base/Asian_F_1_Busi.vrm" -o .tmp-vrm/female-business.vrm
+          curl --fail --location --retry 3 "$base/Asian_F_1_Medi.vrm" -o .tmp-vrm/female-medical.vrm
+          curl --fail --location --retry 3 "$base/Asian_F_1_Util.vrm" -o .tmp-vrm/female-utility.vrm
+          ls -lh .tmp-vrm
+
+      - name: Optimize embedded textures and validate humanoid rig
+        shell: bash
+        run: |
+          set -euo pipefail
+          for src in .tmp-vrm/*.vrm; do
+            name="$(basename "$src")"
+            python scripts/optimize_vrm_images.py "$src" "public/avatars/realistic/$name" 1024
+          done
+          ls -lh public/avatars/realistic/*.vrm
+
+      - name: Add attribution
+        run: |
+          cat > public/avatars/realistic/NOTICE.md <<'EOF'
+          # Realistic VRM asset attribution
+
+          The VRM files in this directory are optimized copies of VRM 1.0 conversions from `TLTMedia/valid-vrm-avatars`, based on Google's VALID (Visually Aligned Inclusive Dataset) avatars.
+
+          - Original 3D avatars: Google VALID — https://github.com/google-research/google-research/tree/master/valid
+          - VRM conversion / ARKit blend shape integration: TLTMedia — https://github.com/TLTMedia/valid-vrm-avatars
+          - License: Creative Commons Attribution 4.0 International (CC BY 4.0) — https://creativecommons.org/licenses/by/4.0/
+          - Local modification: embedded textures resized to a maximum of 1024px for browser delivery. VRM humanoid mappings, meshes, expressions, materials, and extension metadata are retained.
+
+          Imported source variants: Asian M/F body type 1 in Casual, Business, Medical, and Utility outfits.
+          EOF
+
+      - name: Commit imported assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/avatars/realistic
+          if git diff --cached --quiet; then
+            echo 'No asset changes to commit.'
+            exit 0
+          fi
+          git commit -m 'Import optimized CC BY realistic VRM avatars'
+          git push origin HEAD:main
