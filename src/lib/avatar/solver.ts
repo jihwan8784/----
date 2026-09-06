@@ -464,17 +464,3 @@ function basisQuat(
   );
 }
 
-/** Orthonormal frame whose first axis is `primary` and second is near `hint`. */
-function orthoBasis(
-  primary: THREE.Vector3,
-  hint: THREE.Vector3,
-): THREE.Quaternion | null {
-  const x = primary.clone().normalize();
-  const z = new THREE.Vector3().crossVectors(x, hint);
-  if (z.lengthSq() < 1e-8) return null;
-  z.normalize();
-  const y = new THREE.Vector3().crossVectors(z, x).normalize();
-  return new THREE.Quaternion().setFromRotationMatrix(
-    new THREE.Matrix4().makeBasis(x, y, z),
-  );
-}
