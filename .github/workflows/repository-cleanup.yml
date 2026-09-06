@@ -52,3 +52,5 @@ jobs:
           git add -A
           git commit -m 'Clean up Avatar Studio files and names'
           git push origin HEAD:repository-cleanup-20260907
+
+# Retry after updating the renamed MediaPipe helper message.
