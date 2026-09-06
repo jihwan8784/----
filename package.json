@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "check:rig": "node --import tsx scripts/rig-check.mts",
+    "check:assets": "node scripts/validate-vrm-assets.mjs",
     "postinstall": "node scripts/copy-wasm.mjs"
   },
   "dependencies": {
