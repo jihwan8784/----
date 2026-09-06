@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - repository-cleanup-20260907
   pull_request:
 
 permissions:
@@ -25,11 +26,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check tracking rig and wrist regression
-        run: npm run check:rig
+      - name: Test full-body tracking and wrist regression
+        run: npm run check:tracking
 
-      - name: Validate bundled VRM assets
-        run: npm run check:assets
+      - name: Validate built-in avatar files
+        run: npm run check:avatars
 
       - name: Lint
         run: npm run lint
