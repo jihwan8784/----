@@ -1,0 +1,50 @@
+name: Apply QA hand fix
+
+on:
+  push:
+    branches:
+      - qa-hardening-20260907
+    paths:
+      - scripts/fix_hand_local_relax.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out QA branch
+        uses: actions/checkout@v4
+        with:
+          ref: qa-hardening-20260907
+
+      - name: Apply local-space hand fix
+        run: python scripts/fix_hand_local_relax.py
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Regression and rig checks
+        run: npm run check:rig
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit validated solver fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/lib/avatar/solver.ts
+          git commit -m 'Keep undetected hands neutral relative to tracked arms'
+          git push origin HEAD:qa-hardening-20260907
