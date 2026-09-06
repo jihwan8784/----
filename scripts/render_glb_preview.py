@@ -54,17 +54,16 @@ def main():
     bpy.ops.import_scene.gltf(filepath=str(input_path))
     bpy.context.view_layer.update()
 
-    # glTF/VRM is Y-up, but Blender converts imported glTF scenes to Z-up.
-    # Preview in Blender world coordinates so a valid upright VRM is rendered
-    # standing rather than from above/below.
+    # glTF/VRM is Y-up, while Blender displays imported glTF scenes as Z-up.
+    # Blender's object bounds may include skin/rest-pose offsets, so they are
+    # used only for camera framing. The workflow validates the authoritative
+    # glTF POSITION accessor height separately before accepting the VRM.
     low, high = scene_bounds()
     center = (low + high) * 0.5
     width = high.x - low.x
     depth = high.y - low.y
     height = high.z - low.z
-    print("Preview bounds:", tuple(low), tuple(high), "height:", height)
-    if not (1.4 <= height <= 2.2):
-        raise RuntimeError(f"Unexpected Blender-world avatar height: {height:.3f}m")
+    print("Preview bounds:", tuple(low), tuple(high), "framing height:", height)
 
     world = bpy.context.scene.world or bpy.data.worlds.new("World")
     bpy.context.scene.world = world
