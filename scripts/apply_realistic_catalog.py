@@ -49,12 +49,14 @@ const HUMAN_VRM_PROFILES = PROJECT_GENDERS.flatMap((gender) =>
 '''
 text = text[:start] + replacement + text[end:]
 
-old_url = 'vrmUrl: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sakurada_Fumiriya.vrm",\n            vrmName: "사람형 남성 · 짧은 머리",'
-new_url = 'vrmUrl: "/avatars/realistic/male-casual.vrm",\n            vrmName: "남성형 학생 · 현실형 캐주얼",'
-count = text.count(old_url)
-if count != 2:
-    raise RuntimeError(f"expected 2 legacy fallback blocks, found {count}")
-text = text.replace(old_url, new_url)
+legacy_url = "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sakurada_Fumiriya.vrm"
+legacy_name = "사람형 남성 · 짧은 머리"
+if text.count(legacy_url) != 2:
+    raise RuntimeError(f"expected 2 legacy fallback URLs, found {text.count(legacy_url)}")
+if text.count(legacy_name) != 2:
+    raise RuntimeError(f"expected 2 legacy fallback names, found {text.count(legacy_name)}")
+text = text.replace(legacy_url, "/avatars/realistic/male-casual.vrm")
+text = text.replace(legacy_name, "남성형 학생 · 현실형 캐주얼")
 
 old_panel = '<Panel title="사람형 VRM" hint="애니풍 대신 project의 전신 모델을 VRM 1.0으로 변환했습니다.">'
 new_panel = '<Panel title="현실형 VRM" hint="CC BY 4.0 현실형 VRM만 사용하며, 전용 모델이 없는 직업은 비활성화했습니다.">'
