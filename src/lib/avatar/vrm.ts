@@ -24,9 +24,9 @@ type AppearanceSlot = keyof AvatarAppearance;
 
 const APPEARANCE_PATTERNS: [AppearanceSlot, RegExp][] = [
   ["hair", /hair|bang|ponytail|髪|眉|まつげ|eyebrow|eyelash/i],
-  ["skin", /face|skin|body|arm|leg|hand|肌|顔/i],
-  ["accent", /shoe|sock|tie|ribbon|button|accessory|metal|靴|リボン/i],
-  ["outfit", /cloth|outfit|wear|shirt|top|bottom|pants|skirt|dress|coat|jacket|uniform|服|トップス|ボトム/i],
+  ["skin", /face|skin|arm|leg|hand|肌|顔/i],
+  ["accent", /shoe|sneaker|sock|tie|ribbon|button|accessory|metal|trim|靴|リボン/i],
+  ["outfit", /cloth|outfit|wear|shirt|tee|tshirt|hoodie|sweater|scrub|suit|top|bottom|pants|jeans|skirt|dress|coat|jacket|uniform|服|トップス|ボトム/i],
 ];
 
 function appearanceSlot(objectName: string, materialName: string): AppearanceSlot | null {

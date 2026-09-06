@@ -155,6 +155,37 @@ export interface UseAvatarEngineArgs {
   autoStart?: boolean;
 }
 
+async function waitForVideoReady(video: HTMLVideoElement, timeoutMs = 4000) {
+  const ready = () =>
+    video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+    video.videoWidth > 0 &&
+    video.videoHeight > 0;
+  if (ready()) return;
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => {
+      video.removeEventListener("loadeddata", onReady);
+      video.removeEventListener("canplay", onReady);
+      window.clearTimeout(timer);
+    };
+    const onReady = () => {
+      if (!ready() || settled) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+    const timer = window.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("카메라 영상 준비 시간이 초과되었습니다."));
+    }, timeoutMs);
+    video.addEventListener("loadeddata", onReady);
+    video.addEventListener("canplay", onReady);
+  });
+}
+
 export function useAvatarEngine({
   canvasRef,
   videoRef,
@@ -385,9 +416,16 @@ export function useAvatarEngine({
         setError("이 브라우저는 웹캠 접근을 지원하지 않습니다 (HTTPS 필요).");
         return;
       }
+
       const requestId = ++cameraRequestRef.current;
       const previousStream = streamRef.current;
+      const currentDevice = previousStream
+        ?.getVideoTracks()[0]
+        ?.getSettings().deviceId;
+      if (id && previousStream?.active && currentDevice === id) return;
+
       let nextStream: MediaStream | null = null;
+      let trackerPaused = false;
       try {
         setStatus(previousStream ? "카메라 전환 중…" : "카메라 여는 중…");
         nextStream = await navigator.mediaDevices.getUserMedia({
@@ -403,8 +441,19 @@ export function useAvatarEngine({
           nextStream.getTracks().forEach((track) => track.stop());
           return;
         }
+
+        trackerRef.current?.stop();
+        trackerPaused = true;
+        setRunning(false);
+        video.pause();
         video.srcObject = nextStream;
         await video.play();
+        await waitForVideoReady(video);
+        if (requestId !== cameraRequestRef.current) {
+          nextStream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
         streamRef.current = nextStream;
         setDeviceId(
           nextStream.getVideoTracks()[0]?.getSettings().deviceId ?? id ?? null,
@@ -416,18 +465,35 @@ export function useAvatarEngine({
         setStatus("");
       } catch (e) {
         nextStream?.getTracks().forEach((track) => track.stop());
-        if (previousStream) {
+
+        if (previousStream?.active) {
           streamRef.current = previousStream;
           video.srcObject = previousStream;
-          await video.play().catch(() => undefined);
-          setRunning(true);
+          try {
+            await video.play();
+            await waitForVideoReady(video);
+            if (trackerPaused) await trackerRef.current?.start(video);
+            setDeviceId(
+              previousStream.getVideoTracks()[0]?.getSettings().deviceId ?? null,
+            );
+            setRunning(true);
+          } catch {
+            streamRef.current = null;
+            video.srcObject = null;
+            setRunning(false);
+          }
+        } else {
+          streamRef.current = null;
+          video.srcObject = null;
+          setRunning(false);
         }
+
         const name = e instanceof DOMException ? e.name : "";
         setError(
           name === "NotAllowedError"
             ? "카메라 권한이 거부되었습니다. 브라우저 주소창의 카메라 아이콘에서 허용해 주세요."
-            : name === "NotFoundError"
-              ? "사용 가능한 카메라를 찾지 못했습니다."
+            : name === "NotFoundError" || name === "OverconstrainedError"
+              ? "선택한 카메라를 열 수 없습니다. 다른 카메라를 선택해 주세요."
               : e instanceof Error
                 ? e.message
                 : "카메라를 시작하지 못했습니다.",
@@ -445,6 +511,7 @@ export function useAvatarEngine({
     streamRef.current = null;
     const video = videoRef.current;
     if (video) video.srcObject = null;
+    setDeviceId(null);
     setRunning(false);
     setStatus("");
   }, [videoRef]);
@@ -660,6 +727,7 @@ export function ControlPanel({ engine }: { engine: Engine }) {
   const selectedProfile =
     HUMAN_VRM_PROFILES.find((profile) => profile.url === s.vrmUrl) ??
     HUMAN_VRM_PROFILES[0];
+  const fixedTextureAvatar = Boolean(s.vrmUrl?.startsWith("/avatars/realistic/"));
 
   const selectProjectAvatar = (
     gender: ProjectGender,
@@ -776,37 +844,46 @@ export function ControlPanel({ engine }: { engine: Engine }) {
           </p>
         </div>
 
-        <div>
-          <p className="mb-1.5 text-[12px] text-white/80">피부 색</p>
-          <div className="flex gap-1.5">
-            {SKIN_COLORS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                aria-label={`피부 색 ${color}`}
-                aria-pressed={s.skinColor === color}
-                onClick={() => s.set("skinColor", color)}
-                className={`h-7 flex-1 rounded-lg border-2 ${
-                  s.skinColor === color ? "border-white" : "border-transparent"
-                }`}
-                style={{ backgroundColor: color }}
-              />
-            ))}
+        {fixedTextureAvatar ? (
+          <div className="rounded-xl border border-amber-300/15 bg-amber-300/[0.06] px-3 py-2 text-[11px] leading-relaxed text-amber-100/70">
+            이 현실형 VRM은 몸·얼굴·복장이 하나의 통합 텍스처라 색상만 따로 바꿀 수 없습니다.
+            색상 조절이 가능한 분리 재질 VRM을 선택하거나 내 VRM 파일을 사용할 때 색상 옵션이 나타납니다.
           </div>
-        </div>
+        ) : (
+          <>
+            <div>
+              <p className="mb-1.5 text-[12px] text-white/80">피부 색</p>
+              <div className="flex gap-1.5">
+                {SKIN_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    aria-label={`피부 색 ${color}`}
+                    aria-pressed={s.skinColor === color}
+                    onClick={() => s.set("skinColor", color)}
+                    className={`h-7 flex-1 rounded-lg border-2 ${
+                      s.skinColor === color ? "border-white" : "border-transparent"
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </div>
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-white/10 bg-black/15 px-3 py-2">
-          <ColorField
-            label="복장"
-            value={s.outfitColor}
-            onChange={(v) => s.set("outfitColor", v)}
-          />
-          <ColorField
-            label="포인트"
-            value={s.accentColor}
-            onChange={(v) => s.set("accentColor", v)}
-          />
-        </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl border border-white/10 bg-black/15 px-3 py-2">
+              <ColorField
+                label="복장"
+                value={s.outfitColor}
+                onChange={(v) => s.set("outfitColor", v)}
+              />
+              <ColorField
+                label="포인트"
+                value={s.accentColor}
+                onChange={(v) => s.set("accentColor", v)}
+              />
+            </div>
+          </>
+        )}
 
         <div className="rounded-lg bg-black/25 px-3 py-2 text-[11px] text-white/50">
           <p>

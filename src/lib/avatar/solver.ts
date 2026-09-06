@@ -251,21 +251,10 @@ export class PoseSolver {
       if (this.settings.fingersEnabled && landmarks && landmarks.length >= 21) {
         this.solveHand(side, landmarks, alpha);
       } else {
-        // No finger data — point the wrist along the forearm and relax fingers.
-        const wrist = usable ? j[`${side}Wrist` as JointName] : undefined;
-        const index = usable ? j[`${side}Index` as JointName] : undefined;
-        if (wrist && index) {
-          const dir = V(index).sub(V(wrist));
-          if (dir.lengthSq() > 1e-8) this.aimBone(handBone, dir.normalize(), alpha);
-        } else if (ATTENTION_DIRECTIONS[handBone]) {
-          this.aimBone(
-            handBone,
-            new THREE.Vector3(...ATTENTION_DIRECTIONS[handBone]!),
-            alpha,
-          );
-        } else {
-          this.relax(handBone, alpha, 0.3);
-        }
+        // No trustworthy finger data: return the wrist and fingers to the
+        // avatar's authored neutral pose. PoseLandmark's index-finger points
+        // are too noisy to use as a substitute hand orientation.
+        this.relax(handBone, alpha, 0.55);
         this.relaxFingers(side, alpha);
       }
     }
@@ -311,35 +300,15 @@ export class PoseSolver {
     const handBone: BoneName = side === "left" ? "leftHand" : "rightHand";
     const wrist = V(lm[0]);
     const middle = V(lm[9]);
-    const indexKnuckle = V(lm[5]);
-    const pinkyKnuckle = V(lm[17]);
 
     const axis = middle.clone().sub(wrist);
     if (axis.lengthSq() < 1e-8) return;
     axis.normalize();
 
-    // Palm-outward normal; the cross product flips sign between hands.
-    const normal = indexKnuckle
-      .clone()
-      .sub(wrist)
-      .cross(pinkyKnuckle.clone().sub(wrist))
-      .multiplyScalar(side === "left" ? -1 : 1);
-
-    if (normal.lengthSq() > 1e-8) {
-      normal.normalize();
-      const target = orthoBasis(axis, normal);
-      // The rest pose: bone axis as authored, palm facing down.
-      const restAxis = this.restDir.get(handBone)?.clone() ?? axis.clone();
-      const restNormal = new THREE.Vector3(0, -1, 0);
-      const rest = orthoBasis(restAxis, restNormal);
-      if (target && rest) {
-        const delta = target.clone().multiply(rest.clone().invert());
-        const w = delta.multiply(this.restWorld.get(handBone)!);
-        this.setWorldBasisRaw(handBone, w, alpha);
-      }
-    } else {
-      this.aimBone(handBone, axis, alpha);
-    }
+    // Aim the wrist along the palm axis. A full palm-normal basis can flip by
+    // 180 degrees when MediaPipe briefly swaps or jitters knuckles; keeping
+    // wrist roll authored makes webcam tracking much more stable.
+    this.aimBone(handBone, axis, alpha);
 
     for (const finger of FINGER_NAMES) {
       const idx = FINGER_LANDMARKS[finger];
@@ -366,7 +335,7 @@ export class PoseSolver {
       for (const s of segments) {
         const bone = fingerBone(side, finger, s);
         if (!this.bones.has(bone)) continue;
-        this.relax(bone, alpha, 0.25);
+        this.relax(bone, alpha, 0.55);
       }
     }
   }

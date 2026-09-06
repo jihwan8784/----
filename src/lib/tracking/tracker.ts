@@ -23,6 +23,12 @@ import { VectorSmoother } from "./smoothing";
 const WASM_PATH = "/mediapipe/wasm";
 const MIN_INFERENCE_INTERVAL_MS = 1000 / 20;
 const MAX_INFERENCE_INTERVAL_MS = 100;
+const MIN_HAND_SCORE = 0.68;
+const MIN_HAND_SIZE = 0.018;
+const MAX_HAND_SIZE = 0.55;
+const MAX_HAND_TO_POSE_WRIST_DISTANCE = 0.28;
+const HAND_CONFIRM_FRAMES = 2;
+const TFLITE_INFO_PATTERN = /Created TensorFlow Lite XNNPACK delegate for CPU/i;
 const MODEL = {
   face: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
   poseLite: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
@@ -60,6 +66,69 @@ function point2d(l: NormalizedLandmark): Point2D {
   };
 }
 
+function videoFrameReady(video: HTMLVideoElement): boolean {
+  return (
+    !video.paused &&
+    !video.ended &&
+    video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+    video.videoWidth > 0 &&
+    video.videoHeight > 0
+  );
+}
+
+function withMediaPipeInfoFilter<T>(run: () => T): T {
+  const originalError = console.error;
+  console.error = (...args: Parameters<typeof console.error>) => {
+    const text = args.map((arg) => String(arg ?? "")).join(" ");
+    if (TFLITE_INFO_PATTERN.test(text)) return;
+    originalError(...args);
+  };
+  try {
+    return run();
+  } finally {
+    console.error = originalError;
+  }
+}
+
+function validHandCandidate(
+  screen: NormalizedLandmark[],
+  handedness: string,
+  poseScreen: NormalizedLandmark[] | null,
+): boolean {
+  if (screen.length < 21) return false;
+  for (const l of screen) {
+    if (!Number.isFinite(l.x) || !Number.isFinite(l.y) || !Number.isFinite(l.z ?? 0)) {
+      return false;
+    }
+    if (l.x < -0.15 || l.x > 1.15 || l.y < -0.15 || l.y > 1.15) return false;
+  }
+
+  const wrist = screen[0];
+  const index = screen[5];
+  const middle = screen[9];
+  const pinky = screen[17];
+  const palmWidth = Math.hypot(index.x - pinky.x, index.y - pinky.y);
+  const palmLength = Math.hypot(middle.x - wrist.x, middle.y - wrist.y);
+  if (
+    palmWidth < MIN_HAND_SIZE ||
+    palmLength < MIN_HAND_SIZE ||
+    palmWidth > MAX_HAND_SIZE ||
+    palmLength > MAX_HAND_SIZE
+  ) {
+    return false;
+  }
+
+  if (poseScreen) {
+    const poseWrist = poseScreen[handedness === "Left" ? 15 : 16];
+    if (poseWrist && (poseWrist.visibility ?? 1) >= 0.35) {
+      const distance = Math.hypot(wrist.x - poseWrist.x, wrist.y - poseWrist.y);
+      if (distance > MAX_HAND_TO_POSE_WRIST_DISTANCE) return false;
+    }
+  }
+
+  return true;
+}
+
 export interface TrackerCallbacks {
   onFrame: (frame: TrackFrame) => void;
   onStats?: (stats: TrackerStats) => void;
@@ -90,6 +159,10 @@ export class Tracker {
 
   private building: Promise<void> | null = null;
   private dirty = true;
+  private handStableFrames: Record<"left" | "right", number> = {
+    left: 0,
+    right: 0,
+  };
 
   constructor(
     private options: TrackerOptions,
@@ -120,6 +193,9 @@ export class Tracker {
     this.lastVideoTime = -1;
     this.lastProcessAt = 0;
     this.frameTimes = [];
+    this.handStableFrames.left = 0;
+    this.handStableFrames.right = 0;
+    this.smoother.reset();
     await this.ensureModels();
     if (!wasRunning) this.loop();
   }
@@ -201,6 +277,9 @@ export class Tracker {
               },
               runningMode: "VIDEO",
               numHands: 2,
+              minHandDetectionConfidence: 0.68,
+              minHandPresenceConfidence: 0.68,
+              minTrackingConfidence: 0.68,
             });
           }
         } else if (this.hand) {
@@ -239,7 +318,7 @@ export class Tracker {
     this.raf = requestAnimationFrame(this.loop);
 
     const video = this.video;
-    if (!video || video.readyState < 2 || video.videoWidth === 0) return;
+    if (!video || !videoFrameReady(video)) return;
     if (document.hidden) return;
     if (this.dirty && !this.building) void this.ensureModels();
     if (video.currentTime === this.lastVideoTime) return;
@@ -293,14 +372,16 @@ export class Tracker {
     const confidence: Partial<Record<JointName, number>> = {};
     let hasPose = false;
     let overlayPose: Point2D[] | null = null;
+    let poseScreen: NormalizedLandmark[] | null = null;
     const rootOffset: Vec3 = { x: 0, y: 0, z: 0 };
 
     if (mode === "full" && this.pose) {
-      const res = this.pose.detectForVideo(video, ts);
+      const res = withMediaPipeInfoFilter(() => this.pose!.detectForVideo(video, ts));
       const world = res.worldLandmarks?.[0];
       const screen = res.landmarks?.[0];
       if (world && screen) {
         hasPose = true;
+        poseScreen = screen;
         overlayPose = showOverlay ? screen.map(point2d) : null;
 
         for (const [idxStr, name] of Object.entries(POSE_INDEX_TO_JOINT)) {
@@ -346,7 +427,7 @@ export class Tracker {
     let overlayFace: Point2D[] | null = null;
 
     if (this.face) {
-      const res = this.face.detectForVideo(video, ts);
+      const res = withMediaPipeInfoFilter(() => this.face!.detectForVideo(video, ts));
       const lm = res.faceLandmarks?.[0];
       if (lm && lm.length > FACE.leftSide) {
         hasFace = true;
@@ -378,19 +459,46 @@ export class Tracker {
 
     const hands: TrackFrame["hands"] = { left: null, right: null };
     const overlayHands: Point2D[][] = [];
+    const seenHand: Record<"left" | "right", boolean> = {
+      left: false,
+      right: false,
+    };
     if (this.hand && mode === "full") {
-      const res = this.hand.detectForVideo(video, ts);
+      const res = withMediaPipeInfoFilter(() => this.hand!.detectForVideo(video, ts));
       const worlds = res.worldLandmarks ?? [];
       for (let i = 0; i < worlds.length; i++) {
-        const label = res.handedness?.[i]?.[0]?.categoryName;
-        if (!label) continue;
-        // MediaPipe reports handedness for the raw (unmirrored) image.
-        const side = (label === "Left") === !mirror ? "left" : "right";
-        hands[side] = worlds[i].map((l) => toAvatar(l, mirror));
-        if (showOverlay && res.landmarks?.[i]) {
-          overlayHands.push(res.landmarks[i].map(point2d));
+        const handed = res.handedness?.[i]?.[0];
+        const label = handed?.categoryName;
+        const score = handed?.score ?? 0;
+        const screen = res.landmarks?.[i];
+        const world = worlds[i];
+        if (
+          !label ||
+          score < MIN_HAND_SCORE ||
+          !screen ||
+          !world ||
+          world.length < 21 ||
+          !validHandCandidate(screen, label, poseScreen)
+        ) {
+          continue;
         }
+
+        // MediaPipe reports handedness for the raw (unmirrored) image.
+        const side: "left" | "right" =
+          (label === "Left") === !mirror ? "left" : "right";
+        seenHand[side] = true;
+        this.handStableFrames[side] = Math.min(
+          HAND_CONFIRM_FRAMES,
+          this.handStableFrames[side] + 1,
+        );
+        if (this.handStableFrames[side] < HAND_CONFIRM_FRAMES) continue;
+
+        hands[side] = world.map((l) => toAvatar(l, mirror));
+        if (showOverlay) overlayHands.push(screen.map(point2d));
       }
+    }
+    for (const side of ["left", "right"] as const) {
+      if (!seenHand[side]) this.handStableFrames[side] = 0;
     }
 
     this.cb.onFrame({
