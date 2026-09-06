@@ -674,7 +674,7 @@ const PROJECT_JOBS: {
     value: "hacker", label: "해커", outfit: "#20203b", accent: "#22d3ee", model: "mapped", match: "closest",
     note: "현실형 캐주얼 복장 · 얼굴 표정 지원",
     variants: {
-      male: { url: "/avatars/occupation/male-student.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
+      male: { url: "/avatars/realistic/male-casual.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
       female: { url: "/avatars/realistic/female-casual.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
     },
   },
@@ -722,7 +722,7 @@ const PROJECT_JOBS: {
     value: "singer", label: "가수", outfit: "#633c89", accent: "#f472b6", model: "mapped", match: "closest",
     note: "현실형 캐주얼 복장 · 얼굴 표정 지원",
     variants: {
-      male: { url: "/avatars/occupation/male-student.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
+      male: { url: "/avatars/realistic/male-casual.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
       female: { url: "/avatars/realistic/female-casual.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
     },
   },

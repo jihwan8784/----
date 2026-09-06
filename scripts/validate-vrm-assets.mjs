@@ -77,6 +77,16 @@ const source = fs.readFileSync(path.join(root, "src/components/AvatarStudio.tsx"
 const urls = [...new Set([...source.matchAll(/\/avatars\/(?:realistic|occupation)\/[a-z-]+\.vrm/g)].map((m) => m[0]))];
 if (urls.length < 10) throw new Error(`Expected catalog VRM references, found only ${urls.length}`);
 
+for (const line of source.split(/\r?\n/)) {
+  if (!line.includes('url: "/avatars/')) continue;
+  if (line.includes('source: "valid"') && line.includes('/avatars/occupation/')) {
+    throw new Error(`Catalog source mismatch: VALID profile points to occupation asset: ${line.trim()}`);
+  }
+  if (line.includes('source: "rocketbox"') && line.includes('/avatars/realistic/')) {
+    throw new Error(`Catalog source mismatch: Rocketbox profile points to VALID asset: ${line.trim()}`);
+  }
+}
+
 for (const url of urls) {
   const requireMorphs = url.startsWith("/avatars/realistic/");
   validateHumanoid(url, requireMorphs);
