@@ -10,7 +10,7 @@ import {
   type FaceDrive,
 } from "@/lib/avatar/expressions";
 import { damp } from "@/lib/tracking/smoothing";
-import type { TrackFrame } from "@/lib/types";
+import type { TrackFrame } from "@/lib/tracking-types";
 
 export type BackgroundKind =
   | "gradient"

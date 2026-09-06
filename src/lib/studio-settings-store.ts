@@ -2,20 +2,16 @@
 
 import { create } from "zustand";
 
-import type { BackgroundKind, CameraPreset } from "@/lib/scene/viewer";
-import { DEFAULT_MANNEQUIN, type MannequinOptions } from "@/lib/avatar/mannequin";
-import type { AvatarKind, PoseQuality, TrackMode } from "@/lib/types";
+import type {
+  BackgroundKind,
+  CameraPreset,
+} from "@/lib/scene/avatar-scene-viewer";
 
 export interface Settings {
-  mode: TrackMode;
-  quality: PoseQuality;
-  hands: boolean;
   mirror: boolean;
 
-  avatarKind: AvatarKind;
   vrmUrl: string | null;
   vrmName: string | null;
-  mannequin: MannequinOptions;
   skinColor: string;
   hairColor: string;
   outfitColor: string;
@@ -41,15 +37,10 @@ interface Store extends Settings {
 }
 
 const initial: Settings = {
-  mode: "full",
-  quality: "lite",
-  hands: true,
   mirror: true,
 
-  avatarKind: "vrm",
-  vrmUrl: "/avatars/occupation/male-student.vrm",
+  vrmUrl: "/avatars/microsoft-rocketbox/male-casual-student.vrm",
   vrmName: "남성형 학생 · Rocketbox 현실형 일상복",
-  mannequin: DEFAULT_MANNEQUIN,
   skinColor: "#efc29f",
   hairColor: "#2a211f",
   outfitColor: "#334f82",
@@ -74,8 +65,3 @@ export const useSettings = create<Store>((set) => ({
   set: (key, value) => set({ [key]: value } as Partial<Settings>),
   patch: (next) => set(next),
 }));
-
-/** Camera preset that suits a tracking mode, used when the mode changes. */
-export function presetForMode(mode: TrackMode): CameraPreset {
-  return mode === "face" ? "face" : "full";
-}

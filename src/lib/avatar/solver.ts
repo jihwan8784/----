@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-import type { JointName, TrackFrame, Vec3 } from "@/lib/types";
+import type { JointName, TrackFrame, Vec3 } from "@/lib/tracking-types";
 import { damp } from "@/lib/tracking/smoothing";
 import {
   BONE_PARENT,

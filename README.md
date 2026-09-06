@@ -1,19 +1,7 @@
 # VRM 아바타 캡처 스튜디오
 
-네 개의 아바타 프로젝트에서 실시간 추적, VRM 렌더링, 촬영 UI를 하나로 통합한 웹 앱입니다.
-
-## 주요 기능
-
-- MediaPipe 기반 전신·손가락 추적(항상 켜짐)
-- VRM 0.x / 1.0 아바타만 지원
-- 비애니 스타일의 남성형·여성형 전신 VRM
-- 피부·복장·포인트 색과 9개 직업 모델 커스텀
-- 로컬 `.vrm` 파일 업로드
-- 다크·스튜디오·크로마키·투명 배경
-- 촬영 버튼 클릭 후 3초 카운트다운
-- 사진을 `YYYY-MM-DD_HH-mm-ss.png` 이름으로 자동 다운로드
-- WebM 녹화와 OBS용 투명 배경 팝아웃
-- 카메라 영상과 추적 데이터는 브라우저 안에서만 처리
+웹캠으로 사람의 전신·손을 추적하고 현실형 VRM 아바타를 실시간으로 움직이는 Next.js 웹 앱입니다.
+카메라 프레임과 추적 데이터는 브라우저 안에서 처리됩니다.
 
 ## 실행
 
@@ -22,19 +10,56 @@ npm install
 npm run dev
 ```
 
-카메라는 localhost 또는 HTTPS 환경에서만 사용할 수 있습니다.
+카메라는 `localhost` 또는 HTTPS에서 사용할 수 있습니다.
 
-## 내장 아바타
+## 주요 기능
 
-내장 아바타는 `jihwan8784/project`의 직업별 전신 GLB를 이 저장소의 변환 스크립트로 VRM 1.0 형식으로 만든 것입니다. 원본 자산의 사용 조건과 저작권 표시는 `jihwan8784/project`를 기준으로 합니다.
+- MediaPipe 전신 추적 + 손 추적 항상 사용
+- VRM 0.x / 1.0 로딩
+- 남성형·여성형과 9개 직업 선택
+- Google VALID / TLTMedia 현실형 VRM
+- Microsoft Rocketbox 직업형 VRM
+- 사용자 `.vrm` 파일 불러오기
+- 배경 선택, 사진 촬영, WebM 녹화, OBS용 `/embed` 화면
 
-```bash
-node scripts/convert-project-glb-to-vrm.mjs input.glb output.vrm "표시 이름"
+## 파일 구조
+
+```text
+src/components/AvatarStudio.tsx              메인 화면·카메라·촬영 UI
+src/lib/studio-settings-store.ts             화면과 아바타 설정 상태
+src/lib/tracking-types.ts                    추적 데이터 타입
+src/lib/tracking/                            MediaPipe 추적 처리
+src/lib/avatar/vrm-loader.ts                 VRM 파일 로딩
+src/lib/avatar/                              리그·포즈·표정 처리
+src/lib/scene/avatar-scene-viewer.ts         Three.js 렌더링 화면
+
+public/avatars/google-valid/                 Google VALID 기반 현실형 VRM
+public/avatars/microsoft-rocketbox/          Microsoft Rocketbox 기반 직업형 VRM
+public/backgrounds/                          선택 가능한 배경 이미지
+
+scripts/prepare-mediapipe-wasm.mjs           MediaPipe WASM 준비
+scripts/test-avatar-tracking.mts             전신·손목 추적 회귀 테스트
+scripts/validate-avatar-files.mjs            내장 VRM 구조·라이선스 검사
 ```
 
-## 통합 출처
+Next.js가 요구하는 `src/app/page.tsx`, `layout.tsx`, `globals.css` 같은 표준 파일 이름은 그대로 유지합니다.
 
-- [vision20400/webcam-avatar-studio](https://github.com/vision20400/webcam-avatar-studio): VRM·MediaPipe 추적 엔진
-- [LPRS1234/pose-persona-booth](https://github.com/LPRS1234/pose-persona-booth): 포토부스 촬영 흐름
-- [jihwan8784/project](https://github.com/jihwan8784/project): 아바타 선택·합성 UI
-- [jihwan8784/----](https://github.com/jihwan8784/----): 통합 대상 프로젝트
+## 검사
+
+```bash
+npm run check:tracking
+npm run check:avatars
+npm run lint
+npm run build
+```
+
+GitHub Actions의 `.github/workflows/ci.yml`도 같은 검사를 실행합니다.
+
+## 내장 VRM 출처
+
+자세한 출처와 라이선스는 각 폴더의 `LICENSE_AND_SOURCE.md`를 확인합니다.
+
+- `public/avatars/google-valid/`: Google VALID + TLTMedia, CC BY 4.0
+- `public/avatars/microsoft-rocketbox/`: Microsoft Rocketbox, MIT
+
+직업 선택에서 정확한 전용 모델이 없는 경우 UI에 가장 가까운 현실형 대체 복장임을 표시합니다.

@@ -1,4 +1,4 @@
-import type { JointName } from "@/lib/types";
+import type { JointName } from "@/lib/tracking-types";
 
 /** MediaPipe BlazePose landmark index -> joint name. Unlisted indices are ignored. */
 export const POSE_INDEX_TO_JOINT: Record<number, JointName> = {

@@ -1,4 +1,4 @@
-import type { TrackFrame } from "@/lib/types";
+import type { TrackFrame } from "@/lib/tracking-types";
 import { FACE_OVAL, HAND_CONNECTIONS, POSE_CONNECTIONS } from "./landmarks";
 
 /**

@@ -74,41 +74,41 @@ function validateHumanoid(relative, requireMorphs) {
 }
 
 const source = fs.readFileSync(path.join(root, "src/components/AvatarStudio.tsx"), "utf8");
-const urls = [...new Set([...source.matchAll(/\/avatars\/(?:realistic|occupation)\/[a-z-]+\.vrm/g)].map((m) => m[0]))];
+const urls = [...new Set([...source.matchAll(/\/avatars\/(?:google-valid|microsoft-rocketbox)\/[a-z-]+\.vrm/g)].map((m) => m[0]))];
 if (urls.length < 10) throw new Error(`Expected catalog VRM references, found only ${urls.length}`);
 
 for (const line of source.split(/\r?\n/)) {
   if (!line.includes('url: "/avatars/')) continue;
-  if (line.includes('source: "valid"') && line.includes('/avatars/occupation/')) {
+  if (line.includes('source: "valid"') && line.includes('/avatars/microsoft-rocketbox/')) {
     throw new Error(`Catalog source mismatch: VALID profile points to occupation asset: ${line.trim()}`);
   }
-  if (line.includes('source: "rocketbox"') && line.includes('/avatars/realistic/')) {
+  if (line.includes('source: "rocketbox"') && line.includes('/avatars/google-valid/')) {
     throw new Error(`Catalog source mismatch: Rocketbox profile points to VALID asset: ${line.trim()}`);
   }
 }
 
 for (const url of urls) {
-  const requireMorphs = url.startsWith("/avatars/realistic/");
+  const requireMorphs = url.startsWith("/avatars/google-valid/");
   validateHumanoid(url, requireMorphs);
 }
 
-const requiredOccupation = [
-  "female-student.vrm",
-  "male-student.vrm",
-  "female-astronaut.vrm",
-  "male-astronaut.vrm",
+const requiredRocketbox = [
+  "female-casual-student.vrm",
+  "male-casual-student.vrm",
+  "female-pilot-for-astronaut.vrm",
+  "male-pilot-for-astronaut.vrm",
   "female-firefighter.vrm",
   "male-firefighter.vrm",
   "female-chef.vrm",
 ];
-for (const name of requiredOccupation) {
-  const file = path.join(root, "public/avatars/occupation", name);
+for (const name of requiredRocketbox) {
+  const file = path.join(root, "public/avatars/microsoft-rocketbox", name);
   if (!fs.existsSync(file)) throw new Error(`Missing generated occupation asset: ${name}`);
 }
 
 for (const notice of [
-  "public/avatars/realistic/NOTICE.md",
-  "public/avatars/occupation/NOTICE.md",
+  "public/avatars/google-valid/LICENSE_AND_SOURCE.md",
+  "public/avatars/microsoft-rocketbox/LICENSE_AND_SOURCE.md",
 ]) {
   if (!fs.existsSync(path.join(root, notice))) throw new Error(`Missing license notice: ${notice}`);
 }

@@ -16,7 +16,7 @@ import type {
   TrackerOptions,
   TrackerStats,
   Vec3,
-} from "@/lib/types";
+} from "@/lib/tracking-types";
 import { FACE, MIRROR_PAIRS, POSE_INDEX_TO_JOINT } from "./landmarks";
 import { VectorSmoother } from "./smoothing";
 
