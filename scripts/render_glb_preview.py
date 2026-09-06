@@ -54,14 +54,17 @@ def main():
     bpy.ops.import_scene.gltf(filepath=str(input_path))
     bpy.context.view_layer.update()
 
+    # glTF/VRM is Y-up, but Blender converts imported glTF scenes to Z-up.
+    # Preview in Blender world coordinates so a valid upright VRM is rendered
+    # standing rather than from above/below.
     low, high = scene_bounds()
     center = (low + high) * 0.5
-    height = high.y - low.y
     width = high.x - low.x
-    depth = high.z - low.z
+    depth = high.y - low.y
+    height = high.z - low.z
     print("Preview bounds:", tuple(low), tuple(high), "height:", height)
     if not (1.4 <= height <= 2.2):
-        raise RuntimeError(f"Unexpected avatar height for preview: {height:.3f}m")
+        raise RuntimeError(f"Unexpected Blender-world avatar height: {height:.3f}m")
 
     world = bpy.context.scene.world or bpy.data.worlds.new("World")
     bpy.context.scene.world = world
@@ -73,14 +76,13 @@ def main():
     bpy.context.scene.camera = camera
     camera_data.lens = 58
 
-    target = Vector((center.x, low.y + height * 0.53, center.z))
+    target = Vector((center.x, center.y, low.z + height * 0.53))
     distance = max(2.4, height * 1.55, width * 2.0, depth * 2.0)
-    add_area("Key", (center.x + 1.2, low.y + height * 1.3, center.z + 2.0), 850, 3.0, target)
-    add_area("Fill", (center.x - 1.4, low.y + height * 1.0, center.z + 1.0), 500, 2.5, target)
-    add_area("Rim", (center.x, low.y + height * 1.4, center.z - 2.0), 650, 2.0, target)
+    add_area("Key", (center.x + 1.2, center.y - 1.7, low.z + height * 1.35), 850, 3.0, target)
+    add_area("Fill", (center.x - 1.4, center.y - 0.8, low.z + height * 1.0), 500, 2.5, target)
+    add_area("Rim", (center.x, center.y + 1.8, low.z + height * 1.35), 650, 2.0, target)
 
     scene = bpy.context.scene
-    # Ubuntu's Blender 4.0 package exposes the legacy EEVEE enum here.
     scene.render.engine = "BLENDER_EEVEE"
     scene.render.resolution_x = 600
     scene.render.resolution_y = 900
@@ -88,8 +90,8 @@ def main():
     scene.render.image_settings.file_format = "PNG"
     scene.render.film_transparent = False
 
-    for label, sign in (("plus-z", 1), ("minus-z", -1)):
-        camera.location = Vector((center.x, target.y, center.z + sign * distance))
+    for label, sign in (("plus-y", 1), ("minus-y", -1)):
+        camera.location = Vector((center.x, center.y + sign * distance, target.z))
         point_at(camera, target)
         scene.render.filepath = str(output_dir / f"{label}.png")
         bpy.ops.render.render(write_still=True)
