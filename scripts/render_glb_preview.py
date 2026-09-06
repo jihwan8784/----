@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import math
 import sys
 from pathlib import Path
 
@@ -81,7 +80,8 @@ def main():
     add_area("Rim", (center.x, low.y + height * 1.4, center.z - 2.0), 650, 2.0, target)
 
     scene = bpy.context.scene
-    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    # Ubuntu's Blender 4.0 package exposes the legacy EEVEE enum here.
+    scene.render.engine = "BLENDER_EEVEE"
     scene.render.resolution_x = 600
     scene.render.resolution_y = 900
     scene.render.resolution_percentage = 100
