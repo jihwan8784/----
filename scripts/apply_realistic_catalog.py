@@ -1,0 +1,155 @@
+from pathlib import Path
+
+studio_path = Path("src/components/AvatarStudio.tsx")
+text = studio_path.read_text(encoding="utf-8")
+
+start = text.index("const PROJECT_JOBS:")
+end = text.index("const SKIN_COLORS", start)
+replacement = '''type RealisticOutfit = "casual" | "business" | "medical" | "utility";
+type JobMatch = "direct" | "closest" | "pending";
+
+const PROJECT_JOBS: {
+  value: ProjectJob;
+  label: string;
+  outfit: string;
+  accent: string;
+  model: RealisticOutfit | null;
+  match: JobMatch;
+  note: string;
+}[] = [
+  { value: "student", label: "학생", outfit: "#334f82", accent: "#37f2dc", model: "casual", match: "closest", note: "현실형 캐주얼 복장" },
+  { value: "astronaut", label: "우주 비행사", outfit: "#e8edf3", accent: "#3b82f6", model: null, match: "pending", note: "전용 현실형 VRM 준비 중" },
+  { value: "hacker", label: "해커", outfit: "#20203b", accent: "#22d3ee", model: "casual", match: "closest", note: "현실형 캐주얼 복장" },
+  { value: "teacher", label: "교사", outfit: "#7a5b45", accent: "#e7c98f", model: "business", match: "closest", note: "현실형 비즈니스 복장" },
+  { value: "doctor", label: "의사", outfit: "#e7f1ef", accent: "#35b8a0", model: "medical", match: "direct", note: "현실형 의료 복장" },
+  { value: "police", label: "경찰", outfit: "#233d69", accent: "#eab308", model: null, match: "pending", note: "전용 현실형 VRM 준비 중" },
+  { value: "firefighter", label: "소방관", outfit: "#9b332d", accent: "#f59e0b", model: "utility", match: "closest", note: "현실형 일반 작업복" },
+  { value: "chef", label: "요리사", outfit: "#f0ece3", accent: "#dc2626", model: null, match: "pending", note: "전용 현실형 VRM 준비 중" },
+  { value: "singer", label: "가수", outfit: "#633c89", accent: "#f472b6", model: "casual", match: "closest", note: "현실형 캐주얼 복장" },
+];
+
+const HUMAN_VRM_PROFILES = PROJECT_GENDERS.flatMap((gender) =>
+  PROJECT_JOBS.flatMap((job) =>
+    job.model
+      ? [{
+          gender: gender.value,
+          genderLabel: gender.label,
+          job: job.value,
+          jobLabel: job.label,
+          outfit: job.outfit,
+          accent: job.accent,
+          match: job.match,
+          note: job.note,
+          url: `/avatars/realistic/${gender.value}-${job.model}.vrm`,
+        }]
+      : [],
+  ),
+);
+
+'''
+text = text[:start] + replacement + text[end:]
+
+old_url = 'vrmUrl: "https://raw.githubusercontent.com/madjin/vrm-samples/master/vroid/beta/Sakurada_Fumiriya.vrm",\n            vrmName: "사람형 남성 · 짧은 머리",'
+new_url = 'vrmUrl: "/avatars/realistic/male-casual.vrm",\n            vrmName: "남성형 학생 · 현실형 캐주얼",'
+count = text.count(old_url)
+if count != 2:
+    raise RuntimeError(f"expected 2 legacy fallback blocks, found {count}")
+text = text.replace(old_url, new_url)
+
+old_panel = '<Panel title="사람형 VRM" hint="애니풍 대신 project의 전신 모델을 VRM 1.0으로 변환했습니다.">'
+new_panel = '<Panel title="현실형 VRM" hint="CC BY 4.0 현실형 VRM만 사용하며, 전용 모델이 없는 직업은 비활성화했습니다.">'
+if old_panel not in text:
+    raise RuntimeError("avatar panel marker not found")
+text = text.replace(old_panel, new_panel, 1)
+
+old_jobs = '''            {PROJECT_JOBS.map((job) => (
+              <button
+                key={job.value}
+                type="button"
+                disabled={engine.avatarLoading}
+                onClick={() =>
+                  selectProjectAvatar(selectedProfile.gender, job.value, true)
+                }
+                className={`rounded-full border px-3 py-1.5 text-[12px] font-medium transition ${
+                  selectedProfile.job === job.value
+                    ? "border-white/40 bg-white text-black"
+                    : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                }`}
+              >
+                {job.label}
+              </button>
+            ))}'''
+new_jobs = '''            {PROJECT_JOBS.map((job) => {
+              const unavailable = job.model === null;
+              return (
+                <button
+                  key={job.value}
+                  type="button"
+                  disabled={engine.avatarLoading || unavailable}
+                  title={job.note}
+                  onClick={() =>
+                    selectProjectAvatar(selectedProfile.gender, job.value, true)
+                  }
+                  className={`rounded-full border px-3 py-1.5 text-[12px] font-medium transition disabled:cursor-not-allowed ${
+                    unavailable
+                      ? "border-white/5 bg-white/[0.02] text-white/25"
+                      : selectedProfile.job === job.value
+                        ? "border-white/40 bg-white text-black"
+                        : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                  }`}
+                >
+                  {job.label}
+                  {unavailable ? <span className="ml-1 text-[9px]">준비 중</span> : null}
+                </button>
+              );
+            })}'''
+if old_jobs not in text:
+    raise RuntimeError("job button block not found")
+text = text.replace(old_jobs, new_jobs, 1)
+
+old_job_close = '''          </div>
+        </div>
+
+        <div>
+          <p className="mb-1.5 text-[12px] text-white/80">피부 색</p>'''
+new_job_close = '''          </div>
+          <p className="mt-2 text-[10px] text-white/40">
+            {selectedProfile.match === "direct" ? "직업 전용 복장" : `현재 적용: ${selectedProfile.note}`}
+          </p>
+        </div>
+
+        <div>
+          <p className="mb-1.5 text-[12px] text-white/80">피부 색</p>'''
+if old_job_close not in text:
+    raise RuntimeError("job note insertion marker not found")
+text = text.replace(old_job_close, new_job_close, 1)
+
+old_status = '''        <p className="rounded-lg bg-black/25 px-3 py-2 text-[11px] text-white/50">
+          {engine.avatarLoading
+            ? "아바타를 불러오는 중…"
+            : `현재 아바타: ${s.vrmName ?? "없음"}`}
+        </p>'''
+new_status = '''        <div className="rounded-lg bg-black/25 px-3 py-2 text-[11px] text-white/50">
+          <p>
+            {engine.avatarLoading
+              ? "아바타를 불러오는 중…"
+              : `현재 아바타: ${s.vrmName ?? "없음"}`}
+          </p>
+          <p className="mt-1 text-[10px] text-white/30">Google VALID / TLTMedia · CC BY 4.0</p>
+        </div>'''
+if old_status not in text:
+    raise RuntimeError("avatar status block not found")
+text = text.replace(old_status, new_status, 1)
+
+studio_path.write_text(text, encoding="utf-8")
+
+store_path = Path("src/lib/store.ts")
+store = store_path.read_text(encoding="utf-8")
+old_default = 'vrmUrl: "/avatars/project/male-student.vrm",\n  vrmName: "남성형 학생",'
+new_default = 'vrmUrl: "/avatars/realistic/male-casual.vrm",\n  vrmName: "남성형 학생 · 현실형 캐주얼",'
+if old_default not in store:
+    raise RuntimeError("legacy default VRM marker not found")
+store = store.replace(old_default, new_default, 1)
+store_path.write_text(store, encoding="utf-8")
+
+print("Realistic VRM catalog patch applied.")
