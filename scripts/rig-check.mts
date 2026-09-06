@@ -205,6 +205,37 @@ console.log("\n입력: 사람이 카메라를 보고 오른팔을 위로 든 자
   );
 }
 
+{
+  console.log("\n손 랜드마크 없음 (Pose 손가락 점이 튀어도 손목은 중립 유지)");
+  const rig = createMannequin();
+  const leftHand = rig.getBone("leftHand")!;
+  const rightHand = rig.getBone("rightHand")!;
+  const leftRest = leftHand.quaternion.clone();
+  const rightRest = rightHand.quaternion.clone();
+  const solver = new PoseSolver(rig);
+  solver.settings.followBody = 0;
+  const noisyIndex: Partial<Record<JointName, MPPoint>> = {
+    ...RAW,
+    leftIndex: [2.5, -2.5, 1.5],
+    rightIndex: [-2.5, 2.5, -1.5],
+  };
+  const frame = buildFrame(false, noisyIndex);
+  for (let i = 0; i < 240; i++) solver.apply(frame, 1 / 60);
+
+  const leftAngle = leftHand.quaternion.angleTo(leftRest);
+  const rightAngle = rightHand.quaternion.angleTo(rightRest);
+  check(
+    "왼손 손목이 rest 포즈를 유지",
+    leftAngle < 0.08,
+    `angle=${leftAngle.toFixed(4)} rad`,
+  );
+  check(
+    "오른손 손목이 rest 포즈를 유지",
+    rightAngle < 0.08,
+    `angle=${rightAngle.toFixed(4)} rad`,
+  );
+}
+
 console.log(
   failures === 0
     ? "\n전부 통과했습니다.\n"
