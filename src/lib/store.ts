@@ -47,8 +47,8 @@ const initial: Settings = {
   mirror: true,
 
   avatarKind: "vrm",
-  vrmUrl: "/avatars/project/male-student.vrm",
-  vrmName: "남성형 학생",
+  vrmUrl: "/avatars/realistic/male-casual.vrm",
+  vrmName: "남성형 학생 · 현실형 캐주얼",
   mannequin: DEFAULT_MANNEQUIN,
   skinColor: "#efc29f",
   hairColor: "#2a211f",
