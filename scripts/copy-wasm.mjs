@@ -25,6 +25,6 @@ try {
   // runtime is missing, and a partial install shouldn't look like a crash.
   console.warn(
     `[mediapipe] wasm 복사를 건너뜁니다: ${err.message}\n` +
-      `  npm install 후 'node scripts/copy-wasm.mjs' 를 직접 실행하세요.`,
+      `  npm install 후 'node scripts/prepare-mediapipe-wasm.mjs' 를 직접 실행하세요.`,
   );
 }
