@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# One-time QA patch; removed after the validated solver commit lands.
 from pathlib import Path
 
 path = Path("src/lib/avatar/solver.ts")
