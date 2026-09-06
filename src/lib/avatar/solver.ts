@@ -254,7 +254,7 @@ export class PoseSolver {
         // No trustworthy finger data: return the wrist and fingers to the
         // avatar's authored neutral pose. PoseLandmark's index-finger points
         // are too noisy to use as a substitute hand orientation.
-        this.relax(handBone, alpha, 0.55);
+        this.relaxLocal(handBone, alpha, 0.55);
         this.relaxFingers(side, alpha);
       }
     }
@@ -335,7 +335,7 @@ export class PoseSolver {
       for (const s of segments) {
         const bone = fingerBone(side, finger, s);
         if (!this.bones.has(bone)) continue;
-        this.relax(bone, alpha, 0.55);
+        this.relaxLocal(bone, alpha, 0.55);
       }
     }
   }
@@ -365,11 +365,37 @@ export class PoseSolver {
     this.setWorldBasisRaw(name, basis.clone().multiply(restWorld), alpha);
   }
 
-  /** Eases a bone back to its authored rest rotation. */
+  /** Eases a bone back to its authored world-space rest rotation. */
   private relax(name: BoneName, alpha: number, rate = 1) {
     const restWorld = this.restWorld.get(name);
     if (!this.bones.has(name) || !restWorld) return;
     this.setWorldBasisRaw(name, restWorld.clone(), alpha * rate);
+  }
+
+  /**
+   * Eases a bone toward its authored LOCAL rotation relative to its current
+   * parent. Hands and fingers need this when the tracked arm is moving: using
+   * the original world-space rest would counter-rotate the wrist against the
+   * forearm and produce the sideways/upside-down hand seen when no hand is
+   * actually detected.
+   */
+  private relaxLocal(name: BoneName, alpha: number, rate = 1) {
+    const bone = this.bones.get(name);
+    const restLocal = this.restLocal.get(name);
+    if (!bone || !restLocal) return;
+
+    const amount = Math.min(1, alpha * rate);
+    let target = restLocal.clone();
+    if (bone.quaternion.dot(target) < 0) {
+      target = target.set(-target.x, -target.y, -target.z, -target.w);
+    }
+    bone.quaternion.slerp(target, amount);
+
+    const parentName = BONE_PARENT[name];
+    const parentWorld = parentName
+      ? this.worldOf(parentName)
+      : this.rig.root.getWorldQuaternion(new THREE.Quaternion());
+    this.world.set(name, parentWorld.clone().multiply(bone.quaternion));
   }
 
   private setWorldBasisRaw(
