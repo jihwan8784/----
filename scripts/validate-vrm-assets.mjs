@@ -31,14 +31,31 @@ function readVrm(file) {
   return { data, json };
 }
 
+function humanoidBoneNames(json, relative) {
+  const vrm1 = json.extensions?.VRMC_vrm;
+  if (vrm1) {
+    return { version: "1.0", names: new Set(Object.keys(vrm1.humanoid?.humanBones ?? {})) };
+  }
+
+  const vrm0 = json.extensions?.VRM;
+  if (vrm0) {
+    const names = new Set(
+      (vrm0.humanoid?.humanBones ?? [])
+        .map((entry) => entry?.bone)
+        .filter(Boolean),
+    );
+    return { version: "0.x", names };
+  }
+
+  throw new Error(`${relative}: missing VRMC_vrm/VRM extension`);
+}
+
 function validateHumanoid(relative, requireMorphs) {
   const file = path.join(root, "public", relative.replace(/^\//, ""));
   if (!fs.existsSync(file)) throw new Error(`${relative}: missing file`);
   const { data, json } = readVrm(file);
-  const vrm = json.extensions?.VRMC_vrm;
-  if (!vrm) throw new Error(`${relative}: missing VRMC_vrm`);
-  const bones = vrm.humanoid?.humanBones ?? {};
-  const missing = [...requiredBones].filter((bone) => !(bone in bones));
+  const humanoid = humanoidBoneNames(json, relative);
+  const missing = [...requiredBones].filter((bone) => !humanoid.names.has(bone));
   if (missing.length) throw new Error(`${relative}: missing humanoid bones: ${missing.join(", ")}`);
   if (!json.skins?.length) throw new Error(`${relative}: no skin`);
   if (!json.materials?.length) throw new Error(`${relative}: no materials`);
@@ -51,7 +68,9 @@ function validateHumanoid(relative, requireMorphs) {
   if (requireMorphs && morphCount === 0) {
     throw new Error(`${relative}: expected facial morph targets but found none`);
   }
-  console.log(`OK ${relative} (${(data.length / 1024 / 1024).toFixed(2)} MB, morphTargets=${morphCount})`);
+  console.log(
+    `OK ${relative} (VRM ${humanoid.version}, ${(data.length / 1024 / 1024).toFixed(2)} MB, morphTargets=${morphCount})`,
+  );
 }
 
 const source = fs.readFileSync(path.join(root, "src/components/AvatarStudio.tsx"), "utf8");
