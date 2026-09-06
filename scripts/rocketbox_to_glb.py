@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os
 import sys
 from pathlib import Path
 
@@ -79,6 +78,28 @@ def rename_humanoid_bones(armature):
     print("Humanoid bones:", ", ".join(target for _, target in resolved))
 
 
+def normalize_fbx_units(armature):
+    """Bake FBX's centimeters-to-meters object scale into the rig.
+
+    Rocketbox imports with an armature object scale near 0.01 while the mesh
+    vertices are already expressed in meter-sized coordinates. Leaving that
+    object transform in the exported glTF shrinks the visible avatar to about
+    1/100 of its intended height. Applying the armature scale preserves the
+    skinned relationship while exporting a meter-scale VRM.
+    """
+    scale = tuple(float(v) for v in armature.scale)
+    print("Armature scale before normalize:", scale)
+    if max(abs(v - 1.0) for v in scale) < 1e-5:
+        return
+
+    bpy.ops.object.select_all(action="DESELECT")
+    armature.select_set(True)
+    bpy.context.view_layer.objects.active = armature
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    bpy.context.view_layer.update()
+    print("Armature scale after normalize:", tuple(float(v) for v in armature.scale))
+
+
 def relink_and_resize_images(texture_dir: Path, max_size=1024):
     files = {p.name.lower(): p for p in texture_dir.glob("*") if p.is_file()}
     linked = 0
@@ -121,11 +142,11 @@ def main():
 
     armature = find_armature()
     print("Armature:", armature.name, "bones:", len(armature.data.bones))
+    normalize_fbx_units(armature)
     rename_humanoid_bones(armature)
     relink_and_resize_images(texture_dir)
     remove_animation_data()
 
-    # Keep the original rig/weights and let the app normalize camera framing.
     bpy.ops.export_scene.gltf(
         filepath=str(output_path),
         export_format="GLB",
@@ -134,6 +155,8 @@ def main():
         export_morph=True,
         export_yup=True,
     )
+    if not output_path.is_file() or output_path.stat().st_size == 0:
+        raise RuntimeError("Blender did not produce a GLB file")
     print(f"Exported {output_path} ({output_path.stat().st_size} bytes)")
 
 
