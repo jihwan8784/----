@@ -18,8 +18,18 @@ jobs:
         with:
           ref: debug-avatar-studio-20260907
 
-      - name: Inspect VRM materials
+      - name: Inspect current VRM materials
         run: python scripts/inspect_vrm_materials.py
+
+      - name: Inspect VTubeMe candidates
+        run: python scripts/inspect_vtubeme_candidates.py
+
+      - name: Upload candidate thumbnails
+        uses: actions/upload-artifact@v4
+        with:
+          name: vtubeme-candidate-thumbnails
+          path: candidate-thumbs
+          if-no-files-found: warn
 
       - name: Install dependencies
         run: npm ci
