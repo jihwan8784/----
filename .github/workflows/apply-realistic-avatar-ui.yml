@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - .github/workflows/apply-realistic-avatar-ui.yml
+      - scripts/apply_realistic_catalog.py
   workflow_dispatch:
 
 permissions:
