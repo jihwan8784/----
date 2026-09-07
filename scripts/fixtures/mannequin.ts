@@ -9,7 +9,7 @@ import {
   type FingerName,
   type RigMetrics,
   type Side,
-} from "./rig";
+} from "../../src/lib/avatar/rig";
 
 export interface MannequinOptions {
   body: string;
