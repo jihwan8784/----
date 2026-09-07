@@ -1,0 +1,34 @@
+name: Fetch VRM candidate previews
+
+on:
+  push:
+    branches:
+      - replace-avatar-library-20260907
+    paths:
+      - .github/workflows/fetch-vrm-previews.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Fetch source preview images
+        run: |
+          set -euo pipefail
+          mkdir -p research-previews
+          for name in nova kai sky ember; do
+            curl -fL --retry 3 "https://vtubeme.com/media/free/${name}/preview.png?v=3" -o "research-previews/${name}.png"
+          done
+
+      - name: Commit previews
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add research-previews
+          git commit -m 'Add temporary VRM source previews'
+          git push origin HEAD:replace-avatar-library-20260907
