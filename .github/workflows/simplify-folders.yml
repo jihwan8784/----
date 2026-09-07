@@ -16,7 +16,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Simplify folders and filenames
-        run: python scripts/simplify-repository.py
+        run: |
+          sed -i 's|@/core/avatar/mannequin|@/lib/avatar/mannequin|' scripts/simplify-repository.py
+          python scripts/simplify-repository.py
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
