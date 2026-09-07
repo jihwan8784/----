@@ -9,13 +9,13 @@ import {
   useState,
 } from "react";
 
-import { loadVRMRig } from "@/core/vrm-loader";
-import { AvatarViewer } from "@/core/scene-viewer";
-import type { BackgroundKind } from "@/core/scene-viewer";
-import { useSettings } from "@/core/settings";
-import { drawOverlay } from "@/core/tracking-overlay";
-import { Tracker } from "@/core/tracking-engine";
-import type { TrackFrame, TrackerStats } from "@/core/types";
+import { loadVRMRig } from "@/core";
+import { AvatarViewer } from "@/core";
+import type { BackgroundKind } from "@/core";
+import { useSettings } from "@/core";
+import { drawOverlay } from "@/core";
+import { Tracker } from "@/core";
+import type { TrackFrame, TrackerStats } from "@/core";
 
 // Shared controls
 

@@ -48,3 +48,8 @@ npm run build
 ```
 
 GitHub Actions의 `Avatar Studio CI`도 같은 검사를 자동 실행합니다.
+
+
+## TypeScript 파일 구조
+
+앱의 일반 `.ts` 소스는 `src/core.ts` 하나로 통합했습니다. React 화면은 `src/AvatarStudio.tsx`와 Next.js의 `src/app/*.tsx`만 유지합니다. 추적, VRM 로더, 리그, 장면, 설정 코드는 모두 `src/core.ts` 안의 섹션으로 구분됩니다.
