@@ -29,6 +29,7 @@ const MAX_HAND_SIZE = 0.55;
 const MAX_HAND_TO_POSE_WRIST_DISTANCE = 0.28;
 const HAND_CONFIRM_FRAMES = 2;
 const TFLITE_INFO_PATTERN = /Created TensorFlow Lite XNNPACK delegate for CPU/i;
+const MEDIA_PIPE_CONSOLE_METHODS = ["error", "warn", "info"] as const;
 const MODEL = {
   face: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
   poseLite: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
@@ -76,18 +77,37 @@ function videoFrameReady(video: HTMLVideoElement): boolean {
   );
 }
 
-function withMediaPipeInfoFilter<T>(run: () => T): T {
-  const originalError = console.error;
-  console.error = (...args: Parameters<typeof console.error>) => {
-    const text = args.map((arg) => String(arg ?? "")).join(" ");
-    if (TFLITE_INFO_PATTERN.test(text)) return;
-    originalError(...args);
-  };
-  try {
-    return run();
-  } finally {
-    console.error = originalError;
+let mediaPipeInfoFilterUsers = 0;
+let restoreMediaPipeInfoFilter: (() => void) | null = null;
+
+function installMediaPipeInfoFilter() {
+  mediaPipeInfoFilterUsers += 1;
+  if (mediaPipeInfoFilterUsers > 1) {
+    return () => {
+      mediaPipeInfoFilterUsers = Math.max(0, mediaPipeInfoFilterUsers - 1);
+      if (mediaPipeInfoFilterUsers === 0) restoreMediaPipeInfoFilter?.();
+    };
   }
+
+  const originals = MEDIA_PIPE_CONSOLE_METHODS.map((method) => [
+    method,
+    console[method],
+  ] as const);
+  for (const [method, original] of originals) {
+    console[method] = ((...args: Parameters<typeof original>) => {
+      const text = args.map((arg) => String(arg ?? "")).join(" ");
+      if (!TFLITE_INFO_PATTERN.test(text)) original(...args);
+    }) as typeof original;
+  }
+
+  restoreMediaPipeInfoFilter = () => {
+    for (const [method, original] of originals) console[method] = original;
+    restoreMediaPipeInfoFilter = null;
+  };
+  return () => {
+    mediaPipeInfoFilterUsers = Math.max(0, mediaPipeInfoFilterUsers - 1);
+    if (mediaPipeInfoFilterUsers === 0) restoreMediaPipeInfoFilter?.();
+  };
 }
 
 function validHandCandidate(
@@ -159,6 +179,7 @@ export class Tracker {
 
   private building: Promise<void> | null = null;
   private dirty = true;
+  private releaseInfoFilter: (() => void) | null = null;
   private handStableFrames: Record<"left" | "right", number> = {
     left: 0,
     right: 0,
@@ -187,6 +208,7 @@ export class Tracker {
   }
 
   async start(video: HTMLVideoElement) {
+    this.releaseInfoFilter ??= installMediaPipeInfoFilter();
     const wasRunning = this.running;
     this.video = video;
     this.running = true;
@@ -208,6 +230,8 @@ export class Tracker {
 
   dispose() {
     this.stop();
+    this.releaseInfoFilter?.();
+    this.releaseInfoFilter = null;
     this.pose?.close();
     this.face?.close();
     this.hand?.close();
@@ -376,7 +400,7 @@ export class Tracker {
     const rootOffset: Vec3 = { x: 0, y: 0, z: 0 };
 
     if (mode === "full" && this.pose) {
-      const res = withMediaPipeInfoFilter(() => this.pose!.detectForVideo(video, ts));
+      const res = this.pose.detectForVideo(video, ts);
       const world = res.worldLandmarks?.[0];
       const screen = res.landmarks?.[0];
       if (world && screen) {
@@ -427,7 +451,7 @@ export class Tracker {
     let overlayFace: Point2D[] | null = null;
 
     if (this.face) {
-      const res = withMediaPipeInfoFilter(() => this.face!.detectForVideo(video, ts));
+      const res = this.face.detectForVideo(video, ts);
       const lm = res.faceLandmarks?.[0];
       if (lm && lm.length > FACE.leftSide) {
         hasFace = true;
@@ -464,7 +488,7 @@ export class Tracker {
       right: false,
     };
     if (this.hand && mode === "full") {
-      const res = withMediaPipeInfoFilter(() => this.hand!.detectForVideo(video, ts));
+      const res = this.hand.detectForVideo(video, ts);
       const worlds = res.worldLandmarks ?? [];
       for (let i = 0; i < worlds.length; i++) {
         const handed = res.handedness?.[i]?.[0];
