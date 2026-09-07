@@ -21,10 +21,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/vrm-candidates
-          curl -fL --retry 3 https://vtubeme.com/media/free/nova/model.vrm -o /tmp/vrm-candidates/nova.vrm
-          curl -fL --retry 3 https://vtubeme.com/media/free/kai/model.vrm -o /tmp/vrm-candidates/kai.vrm
-          curl -fL --retry 3 https://vtubeme.com/media/free/sky/model.vrm -o /tmp/vrm-candidates/sky.vrm
-          curl -fL --retry 3 https://vtubeme.com/media/free/ember/model.vrm -o /tmp/vrm-candidates/ember.vrm
+          for name in nova kai sky ember; do
+            curl -fL --retry 3 "https://vtubeme.com/media/free/${name}/model.vrm" -o "/tmp/vrm-candidates/${name}.vrm"
+            echo "=== ${name} page preview metadata ==="
+            curl -fsSL "https://vtubeme.com/free-vrm-avatars/${name}" \
+              | tr '>' '>\n' \
+              | grep -Ei 'og:image|twitter:image|image_src|preview|thumbnail' \
+              | head -20 || true
+          done
           ls -lh /tmp/vrm-candidates
 
       - name: Inspect VRM metadata and structure
@@ -65,14 +69,10 @@ jobs:
                   bone_names = [x.get('bone') for x in human_bones]
               else:
                   bone_names = list(human_bones.keys())
-              blob = json.dumps(doc, ensure_ascii=False).lower()
-              gender_terms = [term for term in ['gender','female','male','woman','man','girl','boy'] if term in blob]
               print('\n===', path.name, '===')
               print('size_mb:', round(total/1024/1024, 2), 'glb_version:', version, 'vrm_version:', vrm_version)
               print('meta:', json.dumps(meta, ensure_ascii=False, indent=2)[:5000])
-              print('gender_terms_found_in_json:', gender_terms)
               print('nodes:', len(doc.get('nodes', [])), 'meshes:', len(doc.get('meshes', [])), 'materials:', len(doc.get('materials', [])), 'images:', len(doc.get('images', [])))
               print('humanoid_bones:', bone_names)
               print('material_names:', [m.get('name') for m in doc.get('materials', [])][:80])
-              print('mesh_names:', [m.get('name') for m in doc.get('meshes', [])][:80])
           PY
