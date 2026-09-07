@@ -1,4 +1,4 @@
-import type { ExpressionName } from "./rig";
+import type { ExpressionName } from "./avatar-rig";
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 const avg = (a: number, b: number) => (a + b) / 2;

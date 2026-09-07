@@ -1,7 +1,7 @@
 import * as THREE from "three";
 
-import type { JointName, TrackFrame, Vec3 } from "@/lib/types";
-import { damp } from "@/lib/tracking/smoothing";
+import type { JointName, TrackFrame, Vec3 } from "@/core/types";
+import { damp } from "@/core/tracking-smoothing";
 import {
   BONE_PARENT,
   FINGER_NAMES,
@@ -11,7 +11,7 @@ import {
   type AvatarRig,
   type BoneName,
   type Side,
-} from "./rig";
+} from "./avatar-rig";
 
 /** Bones driven by a single joint-to-joint direction. */
 const LIMB_CHAIN: Partial<Record<BoneName, [JointName, JointName]>> = {

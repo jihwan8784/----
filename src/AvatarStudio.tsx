@@ -9,13 +9,13 @@ import {
   useState,
 } from "react";
 
-import { loadVRMRig } from "@/lib/avatar/vrm";
-import { AvatarViewer } from "@/lib/scene/viewer";
-import type { BackgroundKind } from "@/lib/scene/viewer";
-import { useSettings } from "@/lib/store";
-import { drawOverlay } from "@/lib/tracking/overlay";
-import { Tracker } from "@/lib/tracking/tracker";
-import type { TrackFrame, TrackerStats } from "@/lib/types";
+import { loadVRMRig } from "@/core/vrm-loader";
+import { AvatarViewer } from "@/core/scene-viewer";
+import type { BackgroundKind } from "@/core/scene-viewer";
+import { useSettings } from "@/core/settings";
+import { drawOverlay } from "@/core/tracking-overlay";
+import { Tracker } from "@/core/tracking-engine";
+import type { TrackFrame, TrackerStats } from "@/core/types";
 
 // Shared controls
 
@@ -310,7 +310,7 @@ export function useAvatarEngine({
           );
           useSettings.getState().patch({
             avatarKind: "vrm",
-            vrmUrl: "/avatars/occupation/male-student.vrm",
+            vrmUrl: "/avatars/rocketbox-male-student-casual.vrm",
             vrmName: "남성형 학생 · Rocketbox 현실형 일상복",
           });
         } finally {
@@ -324,7 +324,7 @@ export function useAvatarEngine({
 
       useSettings.getState().patch({
         avatarKind: "vrm",
-        vrmUrl: "/avatars/occupation/male-student.vrm",
+        vrmUrl: "/avatars/rocketbox-male-student-casual.vrm",
         vrmName: "남성형 학생 · Rocketbox 현실형 일상복",
       });
     };
@@ -641,7 +641,6 @@ type JobVariant = {
   match: JobMatch;
   note: string;
   source: AvatarSource;
-  faceExpressions: boolean;
 };
 
 const PROJECT_JOBS: {
@@ -658,72 +657,72 @@ const PROJECT_JOBS: {
     value: "student", label: "학생", outfit: "#334f82", accent: "#37f2dc", model: "mapped", match: "closest",
     note: "현실형 일상복 학생 대체 모델",
     variants: {
-      male: { url: "/avatars/occupation/male-student.vrm", match: "closest", note: "현실형 일상복 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox", faceExpressions: false },
-      female: { url: "/avatars/occupation/female-student.vrm", match: "closest", note: "현실형 일상복 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox", faceExpressions: false },
+      male: { url: "/avatars/rocketbox-male-student-casual.vrm", match: "closest", note: "현실형 일상복 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox" },
+      female: { url: "/avatars/rocketbox-female-student-casual.vrm", match: "closest", note: "현실형 일상복 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox" },
     },
   },
   {
     value: "astronaut", label: "우주 비행사", outfit: "#e8edf3", accent: "#3b82f6", model: "mapped", match: "closest",
     note: "현실형 파일럿 기반 대체 모델",
     variants: {
-      male: { url: "/avatars/occupation/male-astronaut.vrm", match: "closest", note: "현실형 파일럿 기반 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox", faceExpressions: false },
-      female: { url: "/avatars/occupation/female-astronaut.vrm", match: "closest", note: "현실형 파일럿 기반 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox", faceExpressions: false },
+      male: { url: "/avatars/rocketbox-male-astronaut-pilot.vrm", match: "closest", note: "현실형 파일럿 기반 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox" },
+      female: { url: "/avatars/rocketbox-female-astronaut-pilot.vrm", match: "closest", note: "현실형 파일럿 기반 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox" },
     },
   },
   {
     value: "hacker", label: "해커", outfit: "#20203b", accent: "#22d3ee", model: "mapped", match: "closest",
     note: "현실형 캐주얼 복장 · 얼굴 표정 지원",
     variants: {
-      male: { url: "/avatars/realistic/male-casual.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
-      female: { url: "/avatars/realistic/female-casual.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
+      male: { url: "/avatars/valid-male-casual.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid" },
+      female: { url: "/avatars/valid-female-casual.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid" },
     },
   },
   {
     value: "teacher", label: "교사", outfit: "#7a5b45", accent: "#e7c98f", model: "mapped", match: "closest",
     note: "현실형 비즈니스 복장 · 얼굴 표정 지원",
     variants: {
-      male: { url: "/avatars/realistic/male-business.vrm", match: "closest", note: "현실형 비즈니스 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
-      female: { url: "/avatars/realistic/female-business.vrm", match: "closest", note: "현실형 비즈니스 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
+      male: { url: "/avatars/valid-male-business.vrm", match: "closest", note: "현실형 비즈니스 복장 · 얼굴 표정 지원", source: "valid" },
+      female: { url: "/avatars/valid-female-business.vrm", match: "closest", note: "현실형 비즈니스 복장 · 얼굴 표정 지원", source: "valid" },
     },
   },
   {
     value: "doctor", label: "의사", outfit: "#e7f1ef", accent: "#35b8a0", model: "mapped", match: "direct",
     note: "현실형 의료 복장 · 얼굴 표정 지원",
     variants: {
-      male: { url: "/avatars/realistic/male-medical.vrm", match: "direct", note: "직업 전용 의료 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
-      female: { url: "/avatars/realistic/female-medical.vrm", match: "direct", note: "직업 전용 의료 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
+      male: { url: "/avatars/valid-male-medical.vrm", match: "direct", note: "직업 전용 의료 복장 · 얼굴 표정 지원", source: "valid" },
+      female: { url: "/avatars/valid-female-medical.vrm", match: "direct", note: "직업 전용 의료 복장 · 얼굴 표정 지원", source: "valid" },
     },
   },
   {
     value: "police", label: "경찰", outfit: "#233d69", accent: "#eab308", model: "mapped", match: "closest",
     note: "안전한 현실형 일반 작업복 기반 대체 모델",
     variants: {
-      male: { url: "/avatars/realistic/male-utility.vrm", match: "closest", note: "안전한 일반 작업복 기반 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
-      female: { url: "/avatars/realistic/female-utility.vrm", match: "closest", note: "안전한 일반 작업복 기반 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
+      male: { url: "/avatars/valid-male-utility.vrm", match: "closest", note: "안전한 일반 작업복 기반 · 얼굴 표정 지원", source: "valid" },
+      female: { url: "/avatars/valid-female-utility.vrm", match: "closest", note: "안전한 일반 작업복 기반 · 얼굴 표정 지원", source: "valid" },
     },
   },
   {
     value: "firefighter", label: "소방관", outfit: "#9b332d", accent: "#f59e0b", model: "mapped", match: "direct",
     note: "Rocketbox 현실형 소방 복장",
     variants: {
-      male: { url: "/avatars/occupation/male-firefighter.vrm", match: "direct", note: "직업 전용 소방 복장 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox", faceExpressions: false },
-      female: { url: "/avatars/occupation/female-firefighter.vrm", match: "direct", note: "직업 전용 소방 복장 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox", faceExpressions: false },
+      male: { url: "/avatars/rocketbox-male-firefighter.vrm", match: "direct", note: "직업 전용 소방 복장 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox" },
+      female: { url: "/avatars/rocketbox-female-firefighter.vrm", match: "direct", note: "직업 전용 소방 복장 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox" },
     },
   },
   {
     value: "chef", label: "요리사", outfit: "#f0ece3", accent: "#dc2626", model: "mapped", match: "closest",
     note: "성별별 최적 현실형 모델",
     variants: {
-      male: { url: "/avatars/realistic/male-utility.vrm", match: "closest", note: "남성 전용 셰프 VRM 대신 현실형 작업복 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
-      female: { url: "/avatars/occupation/female-chef.vrm", match: "direct", note: "직업 전용 셰프 복장 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox", faceExpressions: false },
+      male: { url: "/avatars/valid-male-utility.vrm", match: "closest", note: "남성 전용 셰프 VRM 대신 현실형 작업복 · 얼굴 표정 지원", source: "valid" },
+      female: { url: "/avatars/rocketbox-female-chef.vrm", match: "direct", note: "직업 전용 셰프 복장 · 전신 추적 중심 · 얼굴 표정 일부 제한", source: "rocketbox" },
     },
   },
   {
     value: "singer", label: "가수", outfit: "#633c89", accent: "#f472b6", model: "mapped", match: "closest",
     note: "현실형 캐주얼 복장 · 얼굴 표정 지원",
     variants: {
-      male: { url: "/avatars/realistic/male-casual.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
-      female: { url: "/avatars/realistic/female-casual.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid", faceExpressions: true },
+      male: { url: "/avatars/valid-male-casual.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid" },
+      female: { url: "/avatars/valid-female-casual.vrm", match: "closest", note: "현실형 캐주얼 복장 · 얼굴 표정 지원", source: "valid" },
     },
   },
 ];
@@ -741,7 +740,6 @@ const HUMAN_VRM_PROFILES = PROJECT_GENDERS.flatMap((gender) =>
       match: variant.match,
       note: variant.note,
       source: variant.source,
-      faceExpressions: variant.faceExpressions,
       url: variant.url,
     };
   }),
@@ -763,20 +761,20 @@ const BACKGROUND_PRESETS = [
   {
     value: "ai-stage",
     label: "AI 전시 무대",
-    image: "/backgrounds/ai-stage.png",
-    thumbnail: "/backgrounds/ai-stage-thumb.jpg",
+    image: "/background-ai-stage.png",
+    thumbnail: "/background-ai-stage-thumb.jpg",
   },
   {
     value: "neon-city",
     label: "네온 시티",
-    image: "/backgrounds/neon-city.png",
-    thumbnail: "/backgrounds/neon-city-thumb.jpg",
+    image: "/background-neon-city.png",
+    thumbnail: "/background-neon-city-thumb.jpg",
   },
   {
     value: "busan-future",
     label: "부산 미래 해변",
-    image: "/backgrounds/busan-future.png",
-    thumbnail: "/backgrounds/busan-future-thumb.jpg",
+    image: "/background-busan-future.png",
+    thumbnail: "/background-busan-future-thumb.jpg",
   },
   {
     value: "chroma",
@@ -801,8 +799,7 @@ export function ControlPanel({ engine }: { engine: Engine }) {
     HUMAN_VRM_PROFILES.find((profile) => profile.url === s.vrmUrl) ??
     HUMAN_VRM_PROFILES[0];
   const fixedTextureAvatar = Boolean(
-  s.vrmUrl?.startsWith("/avatars/realistic/") ||
-    s.vrmUrl?.startsWith("/avatars/occupation/"),
+  s.vrmUrl?.startsWith("/avatars/"),
 );
 
   const selectProjectAvatar = (

@@ -1,5 +1,5 @@
-import type { TrackFrame } from "@/lib/types";
-import { FACE_OVAL, HAND_CONNECTIONS, POSE_CONNECTIONS } from "./landmarks";
+import type { TrackFrame } from "@/core/types";
+import { FACE_OVAL, HAND_CONNECTIONS, POSE_CONNECTIONS } from "./tracking-landmarks";
 
 /**
  * Draws the detected skeleton over the camera preview. Coordinates are the raw

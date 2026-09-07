@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { EmbedStage } from "@/components/AvatarStudio";
+import { EmbedStage } from "@/AvatarStudio";
 
 export const metadata = {
   title: "아바타 · 임베드",

@@ -1,5 +1,5 @@
 {
-  "name": "avatar",
+  "name": "ai-korea-avatar-studio",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -7,9 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check:rig": "node --import tsx scripts/rig-check.mts",
-    "check:assets": "node scripts/validate-vrm-assets.mjs",
-    "postinstall": "node scripts/copy-wasm.mjs"
+    "check:rig": "node --import tsx scripts/test-tracking-rig.mts",
+    "check:assets": "node scripts/validate-avatar-assets.mjs",
+    "postinstall": "node scripts/prepare-mediapipe-wasm.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",

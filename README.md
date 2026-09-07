@@ -1,19 +1,7 @@
-# VRM 아바타 캡처 스튜디오
+# AI Korea Avatar Studio
 
-네 개의 아바타 프로젝트에서 실시간 추적, VRM 렌더링, 촬영 UI를 하나로 통합한 웹 앱입니다.
-
-## 주요 기능
-
-- MediaPipe 기반 전신·손가락 추적(항상 켜짐)
-- VRM 0.x / 1.0 아바타만 지원
-- 비애니 스타일의 남성형·여성형 전신 VRM
-- 피부·복장·포인트 색과 9개 직업 모델 커스텀
-- 로컬 `.vrm` 파일 업로드
-- 다크·스튜디오·크로마키·투명 배경
-- 촬영 버튼 클릭 후 3초 카운트다운
-- 사진을 `YYYY-MM-DD_HH-mm-ss.png` 이름으로 자동 다운로드
-- WebM 녹화와 OBS용 투명 배경 팝아웃
-- 카메라 영상과 추적 데이터는 브라우저 안에서만 처리
+웹캠으로 전신과 손을 추적하고 현실형 VRM 아바타에 실시간으로 적용하는 전시용 웹 앱입니다.
+카메라 영상과 추적 데이터는 브라우저 안에서 처리됩니다.
 
 ## 실행
 
@@ -22,19 +10,55 @@ npm install
 npm run dev
 ```
 
-카메라는 localhost 또는 HTTPS 환경에서만 사용할 수 있습니다.
+카메라는 `localhost` 또는 HTTPS 환경에서 사용할 수 있습니다.
 
-## 내장 아바타
+## 단순화된 파일 구조
 
-내장 아바타는 `jihwan8784/project`의 직업별 전신 GLB를 이 저장소의 변환 스크립트로 VRM 1.0 형식으로 만든 것입니다. 원본 자산의 사용 조건과 저작권 표시는 `jihwan8784/project`를 기준으로 합니다.
-
-```bash
-node scripts/convert-project-glb-to-vrm.mjs input.glb output.vrm "표시 이름"
+```text
+.github/workflows/ci.yml       # GitHub 자동 검사
+.openai/hosting.json           # 배포 설정
+public/
+  avatars/                     # 모든 내장 VRM + 라이선스 파일
+  background-*.png/jpg         # 전시 배경 이미지
+scripts/
+  prepare-mediapipe-wasm.mjs   # MediaPipe WASM 준비
+  test-tracking-rig.mts        # 전신/손목 회귀 테스트
+  test-mannequin.ts            # 테스트 전용 단순 리그
+  validate-avatar-assets.mjs   # VRM 구조/라이선스 검사
+src/
+  AvatarStudio.tsx             # 화면 UI + 카메라/촬영 제어
+  app/                         # Next.js 페이지 라우트
+  core/                        # 추적·VRM·렌더링 핵심 코드
 ```
 
-## 통합 출처
+`src/core`는 기능별로 다시 여러 폴더를 만들지 않고 한 폴더에 모았습니다. 파일 이름 앞부분만 보면 역할을 알 수 있습니다.
 
-- [vision20400/webcam-avatar-studio](https://github.com/vision20400/webcam-avatar-studio): VRM·MediaPipe 추적 엔진
-- [LPRS1234/pose-persona-booth](https://github.com/LPRS1234/pose-persona-booth): 포토부스 촬영 흐름
-- [jihwan8784/project](https://github.com/jihwan8784/project): 아바타 선택·합성 UI
-- [jihwan8784/----](https://github.com/jihwan8784/----): 통합 대상 프로젝트
+- `tracking-*`: MediaPipe 추적 관련
+- `avatar-*`, `motion-solver.ts`, `face-expressions.ts`: 아바타 리그/움직임
+- `vrm-loader.ts`: VRM 로딩
+- `scene-viewer.ts`: Three.js 화면 렌더링
+- `settings.ts`: 스튜디오 설정 상태
+- `types.ts`: 공용 타입
+
+## 아바타 파일 이름 규칙
+
+모든 VRM은 `public/avatars` 한 곳에 있습니다.
+
+- `valid-성별-복장.vrm`: Google VALID / TLTMedia 기반, CC BY 4.0
+- `rocketbox-성별-용도.vrm`: Microsoft Rocketbox 기반, MIT
+
+상세 출처와 라이선스는 다음 두 파일에 보존되어 있습니다.
+
+- `public/avatars/LICENSE_GOOGLE_VALID.md`
+- `public/avatars/LICENSE_MICROSOFT_ROCKETBOX.md`
+
+## 검사
+
+```bash
+npm run check:rig
+npm run check:assets
+npm run lint
+npm run build
+```
+
+GitHub의 `Avatar Studio CI`도 위 검사를 자동으로 실행합니다.

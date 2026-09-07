@@ -16,9 +16,9 @@ import type {
   TrackerOptions,
   TrackerStats,
   Vec3,
-} from "@/lib/types";
-import { FACE, MIRROR_PAIRS, POSE_INDEX_TO_JOINT } from "./landmarks";
-import { VectorSmoother } from "./smoothing";
+} from "@/core/types";
+import { FACE, MIRROR_PAIRS, POSE_INDEX_TO_JOINT } from "./tracking-landmarks";
+import { VectorSmoother } from "./tracking-smoothing";
 
 const WASM_PATH = "/mediapipe/wasm";
 const MIN_INFERENCE_INTERVAL_MS = 1000 / 20;

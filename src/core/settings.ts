@@ -2,9 +2,8 @@
 
 import { create } from "zustand";
 
-import type { BackgroundKind, CameraPreset } from "@/lib/scene/viewer";
-import { DEFAULT_MANNEQUIN, type MannequinOptions } from "@/lib/avatar/mannequin";
-import type { AvatarKind, PoseQuality, TrackMode } from "@/lib/types";
+import type { BackgroundKind, CameraPreset } from "@/core/scene-viewer";
+import type { AvatarKind, PoseQuality, TrackMode } from "@/core/types";
 
 export interface Settings {
   mode: TrackMode;
@@ -15,7 +14,6 @@ export interface Settings {
   avatarKind: AvatarKind;
   vrmUrl: string | null;
   vrmName: string | null;
-  mannequin: MannequinOptions;
   skinColor: string;
   hairColor: string;
   outfitColor: string;
@@ -47,9 +45,8 @@ const initial: Settings = {
   mirror: true,
 
   avatarKind: "vrm",
-  vrmUrl: "/avatars/occupation/male-student.vrm",
+  vrmUrl: "/avatars/rocketbox-male-student-casual.vrm",
   vrmName: "남성형 학생 · Rocketbox 현실형 일상복",
-  mannequin: DEFAULT_MANNEQUIN,
   skinColor: "#efc29f",
   hairColor: "#2a211f",
   outfitColor: "#334f82",
