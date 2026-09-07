@@ -39,8 +39,12 @@ function isExported(node) {
 
 function bindingIdentifiers(name, out = []) {
   if (ts.isIdentifier(name)) out.push(name);
-  else for (const element of name.elements ?? []) bindingIdentifiers(element.name, out);
+  else for (const element of name.elements ?? []) if (element.name) bindingIdentifiers(element.name, out);
   return out;
+}
+
+function isInternalSpecifier(spec) {
+  return spec.startsWith("./") || spec.startsWith("@/core/") || spec === "@/core";
 }
 
 const renameBySymbol = new Map();
@@ -54,7 +58,7 @@ for (const fileName of coreFiles) {
   for (const stmt of sf.statements) {
     if (ts.isImportDeclaration(stmt) && ts.isStringLiteral(stmt.moduleSpecifier)) {
       const spec = stmt.moduleSpecifier.text;
-      const internal = spec.startsWith("./") || spec.startsWith("@/core/") || spec === "@/core";
+      const internal = isInternalSpecifier(spec);
       const clause = stmt.importClause;
       if (!clause) continue;
 
@@ -126,6 +130,52 @@ for (const fileName of coreFiles) {
   }
 }
 
+function renamedLocal(id) {
+  const symbol = checker.getSymbolAtLocation(id);
+  return (symbol && renameBySymbol.get(symbol)) || id.text;
+}
+
+function renderExternalImport(stmt) {
+  const sf = stmt.getSourceFile();
+  const spec = stmt.moduleSpecifier.text;
+  const clause = stmt.importClause;
+  if (!clause) return `import ${JSON.stringify(spec)};`;
+
+  const pieces = [];
+  if (clause.name) pieces.push(renamedLocal(clause.name));
+
+  if (clause.namedBindings) {
+    if (ts.isNamespaceImport(clause.namedBindings)) {
+      pieces.push(`* as ${renamedLocal(clause.namedBindings.name)}`);
+    } else {
+      const elements = clause.namedBindings.elements.map((element) => {
+        const importedName = element.propertyName?.text ?? element.name.text;
+        const localName = renamedLocal(element.name);
+        const typePrefix = !clause.isTypeOnly && element.isTypeOnly ? "type " : "";
+        return `${typePrefix}${importedName}${importedName === localName ? "" : ` as ${localName}`}`;
+      });
+      pieces.push(`{ ${elements.join(", ")} }`);
+    }
+  }
+
+  if (!pieces.length) throw new Error(`Could not render import from ${spec} in ${sf.fileName}`);
+  return `import${clause.isTypeOnly ? " type" : ""} ${pieces.join(", ")} from ${JSON.stringify(spec)};`;
+}
+
+const externalImports = [];
+for (const fileName of coreFiles) {
+  const sf = program.getSourceFile(fileName);
+  for (const stmt of sf.statements) {
+    if (
+      ts.isImportDeclaration(stmt) &&
+      ts.isStringLiteral(stmt.moduleSpecifier) &&
+      !isInternalSpecifier(stmt.moduleSpecifier.text)
+    ) {
+      externalImports.push(renderExternalImport(stmt));
+    }
+  }
+}
+
 const replacementsByFile = new Map(coreFiles.map((f) => [f, []]));
 for (const fileName of coreFiles) {
   const sf = program.getSourceFile(fileName);
@@ -138,7 +188,9 @@ for (const fileName of coreFiles) {
     }
     ts.forEachChild(node, visit);
   };
-  visit(sf);
+  for (const stmt of sf.statements) {
+    if (!ts.isImportDeclaration(stmt)) visit(stmt);
+  }
 }
 
 function applyReplacements(text, replacements) {
@@ -155,15 +207,11 @@ function applyReplacements(text, replacements) {
   return out;
 }
 
-function splitModule(text, fileName) {
+function moduleBody(text, fileName) {
   const sf = ts.createSourceFile(fileName, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  const imports = [];
   const remove = [];
   for (const stmt of sf.statements) {
-    if (ts.isImportDeclaration(stmt) && ts.isStringLiteral(stmt.moduleSpecifier)) {
-      const spec = stmt.moduleSpecifier.text;
-      const internal = spec.startsWith("./") || spec.startsWith("@/core/") || spec === "@/core";
-      if (!internal) imports.push(text.slice(stmt.getStart(sf), stmt.end));
+    if (ts.isImportDeclaration(stmt)) {
       remove.push({ start: stmt.getFullStart(), end: stmt.end });
     } else if (
       ts.isExpressionStatement(stmt) &&
@@ -177,16 +225,14 @@ function splitModule(text, fileName) {
   for (const range of remove.sort((a, b) => b.start - a.start)) {
     body = body.slice(0, range.start) + body.slice(range.end);
   }
-  return { imports, body: body.trim() };
+  return body.trim();
 }
 
-const externalImports = [];
 const sections = [];
 for (const fileName of coreFiles) {
   const original = fs.readFileSync(fileName, "utf8");
   const renamed = applyReplacements(original, replacementsByFile.get(fileName));
-  const { imports, body } = splitModule(renamed, fileName);
-  externalImports.push(...imports);
+  const body = moduleBody(renamed, fileName);
   sections.push(`// -----------------------------------------------------------------------------\n// ${path.basename(fileName)}\n// -----------------------------------------------------------------------------\n${body}`);
 }
 
