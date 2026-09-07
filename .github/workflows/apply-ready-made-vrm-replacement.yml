@@ -1,0 +1,374 @@
+name: Apply ready-made VRM replacement
+
+on:
+  push:
+    branches:
+      - replace-avatar-library-20260907
+    paths:
+      - .github/workflows/apply-ready-made-vrm-replacement.yml
+
+permissions:
+  contents: write
+
+jobs:
+  replace-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out replacement branch
+        uses: actions/checkout@v4
+
+      - name: Remove discarded avatar library
+        run: |
+          set -euo pipefail
+          git rm -r public/avatars/google-valid public/avatars/microsoft-rocketbox
+          if [ -d research-previews ]; then git rm -r research-previews; fi
+          mkdir -p public/avatars/vtubeme
+
+      - name: Download original ready-made VRMs
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 https://vtubeme.com/media/free/nova/model.vrm \
+            -o public/avatars/vtubeme/male-student-vtubeme-nova.vrm
+          curl -fL --retry 3 https://vtubeme.com/media/free/kai/model.vrm \
+            -o public/avatars/vtubeme/female-student-vtubeme-kai.vrm
+
+      - name: Update catalog and documentation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          avatar_path = Path('src/components/AvatarStudio.tsx')
+          text = avatar_path.read_text()
+          start = text.index('type ProjectGender = "male" | "female";')
+          end = text.index('const SKIN_COLORS =')
+          catalog = r'''type ProjectGender = "male" | "female";
+          type ProjectJob =
+            | "student"
+            | "teacher"
+            | "doctor"
+            | "police"
+            | "firefighter"
+            | "chef"
+            | "astronaut"
+            | "hacker"
+            | "singer";
+
+          const PROJECT_GENDERS: { value: ProjectGender; label: string }[] = [
+            { value: "male", label: "남성형" },
+            { value: "female", label: "여성형" },
+          ];
+
+          type AvatarSource = "vtubeme";
+
+          type JobVariant = {
+            url: string;
+            note: string;
+            source: AvatarSource;
+          };
+
+          type JobDefinition = {
+            value: ProjectJob;
+            label: string;
+            outfit: string;
+            accent: string;
+            note: string;
+            variants: Partial<Record<ProjectGender, JobVariant>>;
+          };
+
+          const PROJECT_JOBS: JobDefinition[] = [
+            {
+              value: "student",
+              label: "학생",
+              outfit: "#334f82",
+              accent: "#37f2dc",
+              note: "VTubeMe에서 배포하는 원본 ready-made 현실형 VRM",
+              variants: {
+                male: {
+                  url: "/avatars/vtubeme/male-student-vtubeme-nova.vrm",
+                  note: "VTubeMe Nova · 원본 .vrm · 자체 변환 없음",
+                  source: "vtubeme",
+                },
+                female: {
+                  url: "/avatars/vtubeme/female-student-vtubeme-kai.vrm",
+                  note: "VTubeMe Kai · 원본 .vrm · 자체 변환 없음",
+                  source: "vtubeme",
+                },
+              },
+            },
+            { value: "astronaut", label: "우주 비행사", outfit: "#e8edf3", accent: "#3b82f6", note: "조건에 맞는 원본 현실형 VRM 확인 중", variants: {} },
+            { value: "hacker", label: "해커", outfit: "#20203b", accent: "#22d3ee", note: "조건에 맞는 원본 현실형 VRM 확인 중", variants: {} },
+            { value: "teacher", label: "교사", outfit: "#7a5b45", accent: "#e7c98f", note: "조건에 맞는 원본 현실형 VRM 확인 중", variants: {} },
+            { value: "doctor", label: "의사", outfit: "#e7f1ef", accent: "#35b8a0", note: "조건에 맞는 원본 현실형 VRM 확인 중", variants: {} },
+            { value: "police", label: "경찰", outfit: "#233d69", accent: "#eab308", note: "조건에 맞는 안전한 원본 현실형 VRM 확인 중", variants: {} },
+            { value: "firefighter", label: "소방관", outfit: "#9b332d", accent: "#f59e0b", note: "조건에 맞는 원본 현실형 VRM 확인 중", variants: {} },
+            { value: "chef", label: "요리사", outfit: "#f0ece3", accent: "#dc2626", note: "조건에 맞는 원본 현실형 VRM 확인 중", variants: {} },
+            { value: "singer", label: "가수", outfit: "#633c89", accent: "#f472b6", note: "조건에 맞는 원본 현실형 VRM 확인 중", variants: {} },
+          ];
+
+          const HUMAN_VRM_PROFILES = PROJECT_GENDERS.flatMap((gender) =>
+            PROJECT_JOBS.flatMap((job) => {
+              const variant = job.variants[gender.value];
+              if (!variant) return [];
+              return [{
+                gender: gender.value,
+                genderLabel: gender.label,
+                job: job.value,
+                jobLabel: job.label,
+                outfit: job.outfit,
+                accent: job.accent,
+                note: variant.note,
+                source: variant.source,
+                url: variant.url,
+              }];
+            }),
+          );
+
+          '''
+          # Remove indentation added by the Python heredoc formatting above.
+          catalog = '\n'.join(line[10:] if line.startswith('          ') else line for line in catalog.splitlines()) + '\n\n'
+          text = text[:start] + catalog + text[end:]
+
+          old_fixed = '''  const fixedTextureAvatar = Boolean(
+            s.vrmUrl?.startsWith("/avatars/google-valid/") ||
+              s.vrmUrl?.startsWith("/avatars/microsoft-rocketbox/"),
+          );'''
+          if old_fixed not in text:
+              raise SystemExit('Could not locate old fixed-texture avatar check')
+          text = text.replace(old_fixed, '  const fixedTextureAvatar = false;')
+
+          text = text.replace(
+              '<Panel title="현실형 VRM" hint="현실형 VRM · Google VALID(CC BY 4.0) + Microsoft Rocketbox(MIT)">',
+              '<Panel title="현실형 VRM" hint="검증한 원본 .vrm만 사용 · 자체 변환/제작 VRM 제외">',
+          )
+
+          old_buttons = '''            {PROJECT_JOBS.map((job) => (
+              <button
+                key={job.value}
+                type="button"
+                disabled={engine.avatarLoading}
+                title={job.note}
+                onClick={() =>
+                  selectProjectAvatar(selectedProfile.gender, job.value, true)
+                }
+                className={`rounded-full border px-3 py-1.5 text-[12px] font-medium transition disabled:cursor-wait disabled:opacity-55 ${
+                  selectedProfile.job === job.value
+                    ? "border-white/40 bg-white text-black"
+                    : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                }`}
+              >
+                {job.label}
+              </button>
+            ))}'''
+          new_buttons = '''            {PROJECT_JOBS.map((job) => {
+              const available = Boolean(job.variants[selectedProfile.gender]);
+              return (
+                <button
+                  key={job.value}
+                  type="button"
+                  disabled={engine.avatarLoading || !available}
+                  title={job.note}
+                  onClick={() =>
+                    selectProjectAvatar(selectedProfile.gender, job.value, true)
+                  }
+                  className={`rounded-full border px-3 py-1.5 text-[12px] font-medium transition disabled:cursor-not-allowed ${
+                    !available
+                      ? "border-white/5 bg-white/[0.02] text-white/25"
+                      : selectedProfile.job === job.value
+                        ? "border-white/40 bg-white text-black"
+                        : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                  }`}
+                >
+                  {job.label}
+                  {!available ? <span className="ml-1 text-[9px]">준비 중</span> : null}
+                </button>
+              );
+            })}'''
+          if old_buttons not in text:
+              raise SystemExit('Could not locate old job button block')
+          text = text.replace(old_buttons, new_buttons)
+          text = text.replace(
+              '{selectedProfile.match === "direct" ? "직업 전용 복장" : `현재 적용: ${selectedProfile.note}`}',
+              '{`현재 적용: ${selectedProfile.note}`}',
+          )
+          text = text.replace(
+              '<p className="mt-1 text-[10px] text-white/30">{selectedProfile.source === "rocketbox" ? "Microsoft Rocketbox · MIT" : "Google VALID / TLTMedia · CC BY 4.0"}</p>',
+              '<p className="mt-1 text-[10px] text-white/30">VTubeMe · CC BY 4.0 · 원본 ready-made .vrm</p>',
+          )
+          if 'google-valid' in text or 'microsoft-rocketbox' in text or 'selectedProfile.match' in text:
+              raise SystemExit('Discarded avatar references still remain in AvatarStudio.tsx')
+          avatar_path.write_text(text)
+
+          store = Path('src/lib/studio-settings-store.ts')
+          store_text = store.read_text()
+          store_text = store_text.replace(
+              'vrmUrl: "/avatars/microsoft-rocketbox/male-casual-student.vrm",\n  vrmName: "남성형 학생 · Rocketbox 현실형 일상복",',
+              'vrmUrl: "/avatars/vtubeme/male-student-vtubeme-nova.vrm",\n  vrmName: "남성형 학생 · VTubeMe Nova",',
+          )
+          if 'microsoft-rocketbox' in store_text or 'google-valid' in store_text:
+              raise SystemExit('Discarded avatar reference remains in settings store')
+          store.write_text(store_text)
+
+          Path('public/avatars/vtubeme/LICENSE_AND_SOURCE.md').write_text('''# VTubeMe ready-made VRM attribution
+
+These files are downloaded as original ready-made `.vrm` files from VTubeMe. They are not converted from FBX/GLB and are not generated or rebuilt by this repository.
+
+- `male-student-vtubeme-nova.vrm`
+  - Source page: https://vtubeme.com/free-vrm-avatars/nova
+  - Original VRM: https://vtubeme.com/media/free/nova/model.vrm
+- `female-student-vtubeme-kai.vrm`
+  - Source page: https://vtubeme.com/free-vrm-avatars/kai
+  - Original VRM: https://vtubeme.com/media/free/kai/model.vrm
+
+License: Creative Commons Attribution 4.0 (CC BY 4.0). VTubeMe states that the ready-made models may be modified and redistributed with attribution.
+
+The male/female option assignment is this project's UI categorization of the avatar presentation. VTubeMe's public model pages and VRM metadata do not expose a separate gender field.
+''')
+
+          Path('public/avatars/README.md').write_text('''# 내장 VRM 목록
+
+이 폴더에는 **외부에서 이미 VRM으로 배포되는 파일**만 넣습니다. FBX/GLB를 이 프로젝트에서 임의 변환하거나 새 VRM으로 제작하지 않습니다.
+
+## 현재 적용
+
+| 옵션 | 파일 | 원본 | 라이선스 |
+|---|---|---|---|
+| 남성형 학생 | `vtubeme/male-student-vtubeme-nova.vrm` | VTubeMe Nova | CC BY 4.0 |
+| 여성형 학생 | `vtubeme/female-student-vtubeme-kai.vrm` | VTubeMe Kai | CC BY 4.0 |
+
+우주 비행사, 해커, 교사, 의사, 경찰, 소방관, 요리사, 가수는 조건에 맞는 **현실형 + 원본 VRM + 재배포 가능한 라이선스**가 확인될 때만 추가합니다. 확인 전에는 UI에서 `준비 중`으로 비활성화합니다.
+
+출처와 라이선스 세부 내용은 `vtubeme/LICENSE_AND_SOURCE.md`를 확인합니다.
+''')
+
+          readme = Path('README.md')
+          readme_text = readme.read_text()
+          readme_text = readme_text.replace(
+              '- Google VALID / TLTMedia 현실형 VRM\n- Microsoft Rocketbox 직업형 VRM',
+              '- 외부에서 원본 `.vrm`으로 배포되는 현실형 아바타만 사용\n- 라이선스와 전신·손 리깅을 검증한 모델만 선택 가능',
+          )
+          readme_text = readme_text.replace(
+              'public/avatars/google-valid/                 Google VALID 기반 현실형 VRM\npublic/avatars/microsoft-rocketbox/          Microsoft Rocketbox 기반 직업형 VRM',
+              'public/avatars/vtubeme/                      VTubeMe 원본 ready-made VRM',
+          )
+          old_source = '''- `public/avatars/google-valid/`: Google VALID + TLTMedia, CC BY 4.0
+- `public/avatars/microsoft-rocketbox/`: Microsoft Rocketbox, MIT
+
+직업 선택에서 정확한 전용 모델이 없는 경우 UI에 가장 가까운 현실형 대체 복장임을 표시합니다.'''
+          new_source = '''- `public/avatars/vtubeme/`: VTubeMe ready-made VRM, CC BY 4.0
+
+정확히 맞는 원본 VRM이 확인되지 않은 직업은 비슷한 모델로 임의 대체하지 않고 `준비 중`으로 비활성화합니다.'''
+          readme_text = readme_text.replace(old_source, new_source)
+          if 'google-valid' in readme_text or 'microsoft-rocketbox' in readme_text or 'Rocketbox' in readme_text or 'Google VALID' in readme_text:
+              raise SystemExit('Discarded avatar source remains in README')
+          readme.write_text(readme_text)
+          PY
+
+      - name: Replace avatar validation
+        run: |
+          cat > scripts/validate-avatar-files.mjs <<'EOF'
+          #!/usr/bin/env node
+
+          import fs from "node:fs";
+          import path from "node:path";
+
+          const root = process.cwd();
+          const requiredBones = new Set([
+            "hips", "spine", "chest", "neck", "head",
+            "leftShoulder", "leftUpperArm", "leftLowerArm", "leftHand",
+            "rightShoulder", "rightUpperArm", "rightLowerArm", "rightHand",
+            "leftUpperLeg", "leftLowerLeg", "leftFoot",
+            "rightUpperLeg", "rightLowerLeg", "rightFoot",
+            "leftThumbProximal", "leftIndexProximal", "leftMiddleProximal", "leftRingProximal", "leftLittleProximal",
+            "rightThumbProximal", "rightIndexProximal", "rightMiddleProximal", "rightRingProximal", "rightLittleProximal",
+          ]);
+
+          function readVrm(file) {
+            const data = fs.readFileSync(file);
+            if (data.toString("ascii", 0, 4) !== "glTF") throw new Error(`${file}: not binary glTF/VRM`);
+            if (data.readUInt32LE(4) !== 2) throw new Error(`${file}: expected glTF 2.0`);
+            const jsonLength = data.readUInt32LE(12);
+            const jsonType = data.readUInt32LE(16);
+            if (jsonType !== 0x4e4f534a) throw new Error(`${file}: first chunk is not JSON`);
+            const json = JSON.parse(data.subarray(20, 20 + jsonLength).toString("utf8").trimEnd());
+            return { data, json };
+          }
+
+          function inspectVrm(relative) {
+            const file = path.join(root, "public", relative.replace(/^\//, ""));
+            if (!fs.existsSync(file)) throw new Error(`${relative}: missing file`);
+            const { data, json } = readVrm(file);
+            const vrm0 = json.extensions?.VRM;
+            const vrm1 = json.extensions?.VRMC_vrm;
+            let names;
+            let version;
+            let meta;
+            if (vrm1) {
+              names = new Set(Object.keys(vrm1.humanoid?.humanBones ?? {}));
+              version = "1.0";
+              meta = vrm1.meta ?? {};
+            } else if (vrm0) {
+              names = new Set((vrm0.humanoid?.humanBones ?? []).map((entry) => entry?.bone).filter(Boolean));
+              version = "0.x";
+              meta = vrm0.meta ?? {};
+            } else {
+              throw new Error(`${relative}: missing VRM extension`);
+            }
+            const missing = [...requiredBones].filter((bone) => !names.has(bone));
+            if (missing.length) throw new Error(`${relative}: missing humanoid bones: ${missing.join(", ")}`);
+            if (!json.skins?.length) throw new Error(`${relative}: no skin`);
+            if (!json.materials?.length) throw new Error(`${relative}: no materials`);
+            const primitives = (json.meshes ?? []).flatMap((mesh) => mesh.primitives ?? []);
+            if (!primitives.some((p) => p.attributes?.JOINTS_0 !== undefined && p.attributes?.WEIGHTS_0 !== undefined)) {
+              throw new Error(`${relative}: no JOINTS_0/WEIGHTS_0`);
+            }
+            const morphCount = primitives.reduce((sum, p) => sum + (p.targets?.length ?? 0), 0);
+            if (morphCount === 0) throw new Error(`${relative}: expected facial morph targets`);
+            if (meta.author !== "VTubeMe") throw new Error(`${relative}: unexpected author ${meta.author ?? "missing"}`);
+            if (meta.licenseName !== "CC_BY") throw new Error(`${relative}: expected CC_BY metadata`);
+            if (meta.allowedUserName !== "Everyone") throw new Error(`${relative}: avatar is not marked for everyone`);
+            if (meta.commercialUssageName !== "Allow") throw new Error(`${relative}: commercial use not marked Allow`);
+            console.log(`OK ${relative} (VRM ${version}, ${(data.length / 1024 / 1024).toFixed(2)} MB, morphTargets=${morphCount})`);
+          }
+
+          for (const discarded of ["public/avatars/google-valid", "public/avatars/microsoft-rocketbox"]) {
+            if (fs.existsSync(path.join(root, discarded))) throw new Error(`Discarded avatar directory still exists: ${discarded}`);
+          }
+
+          const source = fs.readFileSync(path.join(root, "src/components/AvatarStudio.tsx"), "utf8");
+          if (/google-valid|microsoft-rocketbox|Rocketbox|Google VALID/.test(source)) {
+            throw new Error("Discarded avatar references remain in AvatarStudio.tsx");
+          }
+          const urls = [...new Set([...source.matchAll(/\/avatars\/vtubeme\/[a-z-]+\.vrm/g)].map((m) => m[0]))];
+          if (urls.length !== 2) throw new Error(`Expected exactly 2 verified ready-made VRMs, found ${urls.length}`);
+          for (const url of urls) inspectVrm(url);
+
+          const notice = path.join(root, "public/avatars/vtubeme/LICENSE_AND_SOURCE.md");
+          if (!fs.existsSync(notice)) throw new Error("Missing VTubeMe license/source notice");
+
+          console.log(`Validated ${urls.length} original VTubeMe VRMs. Unsupported jobs remain disabled instead of using substitutes.`);
+          EOF
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate replacement
+        run: |
+          npm run check:tracking
+          npm run check:avatars
+          npm run lint -- --max-warnings=0
+          npm run build
+
+      - name: Commit replacement
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Replace discarded avatars with original ready-made VRMs'
+          git push origin HEAD:replace-avatar-library-20260907
