@@ -1,4 +1,4 @@
-import type { Vec3 } from "@/lib/tracking-types";
+import type { Vec3 } from "@/core/types";
 
 /**
  * 1€ filter — low latency when the signal moves fast, heavy smoothing when it

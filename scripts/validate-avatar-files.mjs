@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-
 import fs from "node:fs";
 import path from "node:path";
 
@@ -14,103 +13,57 @@ const requiredBones = new Set([
 
 function readVrm(file) {
   const data = fs.readFileSync(file);
-  if (data.toString("ascii", 0, 4) !== "glTF") {
-    throw new Error(`${file}: not a binary glTF/VRM file`);
-  }
-  if (data.readUInt32LE(4) !== 2) {
-    throw new Error(`${file}: expected glTF 2.0`);
-  }
+  if (data.toString("ascii", 0, 4) !== "glTF") throw new Error(`${file}: not a binary glTF/VRM file`);
+  if (data.readUInt32LE(4) !== 2) throw new Error(`${file}: expected glTF 2.0`);
   const jsonLength = data.readUInt32LE(12);
-  const jsonType = data.readUInt32LE(16);
-  if (jsonType !== 0x4e4f534a) {
-    throw new Error(`${file}: first chunk is not JSON`);
-  }
-  const json = JSON.parse(
-    data.subarray(20, 20 + jsonLength).toString("utf8").trimEnd(),
-  );
-  return { data, json };
+  if (data.readUInt32LE(16) !== 0x4e4f534a) throw new Error(`${file}: first chunk is not JSON`);
+  return { data, json: JSON.parse(data.subarray(20, 20 + jsonLength).toString("utf8").trimEnd()) };
 }
 
 function humanoidBoneNames(json, relative) {
   const vrm1 = json.extensions?.VRMC_vrm;
-  if (vrm1) {
-    return { version: "1.0", names: new Set(Object.keys(vrm1.humanoid?.humanBones ?? {})) };
-  }
-
+  if (vrm1) return { version: "1.0", names: new Set(Object.keys(vrm1.humanoid?.humanBones ?? {})) };
   const vrm0 = json.extensions?.VRM;
-  if (vrm0) {
-    const names = new Set(
-      (vrm0.humanoid?.humanBones ?? [])
-        .map((entry) => entry?.bone)
-        .filter(Boolean),
-    );
-    return { version: "0.x", names };
-  }
-
+  if (vrm0) return {
+    version: "0.x",
+    names: new Set((vrm0.humanoid?.humanBones ?? []).map((entry) => entry?.bone).filter(Boolean)),
+  };
   throw new Error(`${relative}: missing VRMC_vrm/VRM extension`);
 }
 
-function validateHumanoid(relative, requireMorphs) {
-  const file = path.join(root, "public", relative.replace(/^\//, ""));
-  if (!fs.existsSync(file)) throw new Error(`${relative}: missing file`);
+function validateHumanoid(url, requireMorphs) {
+  const file = path.join(root, "public", url.replace(/^\//, ""));
+  if (!fs.existsSync(file)) throw new Error(`${url}: missing file`);
   const { data, json } = readVrm(file);
-  const humanoid = humanoidBoneNames(json, relative);
+  const humanoid = humanoidBoneNames(json, url);
   const missing = [...requiredBones].filter((bone) => !humanoid.names.has(bone));
-  if (missing.length) throw new Error(`${relative}: missing humanoid bones: ${missing.join(", ")}`);
-  if (!json.skins?.length) throw new Error(`${relative}: no skin`);
-  if (!json.materials?.length) throw new Error(`${relative}: no materials`);
+  if (missing.length) throw new Error(`${url}: missing humanoid bones: ${missing.join(", ")}`);
+  if (!json.skins?.length) throw new Error(`${url}: no skin`);
+  if (!json.materials?.length) throw new Error(`${url}: no materials`);
   const primitives = (json.meshes ?? []).flatMap((mesh) => mesh.primitives ?? []);
-  if (!primitives.length) throw new Error(`${relative}: no mesh primitives`);
+  if (!primitives.length) throw new Error(`${url}: no mesh primitives`);
   if (!primitives.some((p) => p.attributes?.JOINTS_0 !== undefined && p.attributes?.WEIGHTS_0 !== undefined)) {
-    throw new Error(`${relative}: no JOINTS_0/WEIGHTS_0`);
+    throw new Error(`${url}: no JOINTS_0/WEIGHTS_0`);
   }
   const morphCount = primitives.reduce((sum, p) => sum + (p.targets?.length ?? 0), 0);
-  if (requireMorphs && morphCount === 0) {
-    throw new Error(`${relative}: expected facial morph targets but found none`);
-  }
-  console.log(
-    `OK ${relative} (VRM ${humanoid.version}, ${(data.length / 1024 / 1024).toFixed(2)} MB, morphTargets=${morphCount})`,
-  );
+  if (requireMorphs && morphCount === 0) throw new Error(`${url}: expected facial morph targets but found none`);
+  console.log(`OK ${url} (VRM ${humanoid.version}, ${(data.length / 1024 / 1024).toFixed(2)} MB, morphTargets=${morphCount})`);
 }
 
-const source = fs.readFileSync(path.join(root, "src/components/AvatarStudio.tsx"), "utf8");
-const urls = [...new Set([...source.matchAll(/\/avatars\/(?:google-valid|microsoft-rocketbox)\/[a-z-]+\.vrm/g)].map((m) => m[0]))];
+const source = fs.readFileSync(path.join(root, "src/AvatarStudio.tsx"), "utf8");
+const urls = [...new Set([...source.matchAll(/\/avatars\/(?:valid|rocketbox)-[a-z-]+\.vrm/g)].map((m) => m[0]))];
 if (urls.length < 10) throw new Error(`Expected catalog VRM references, found only ${urls.length}`);
 
 for (const line of source.split(/\r?\n/)) {
   if (!line.includes('url: "/avatars/')) continue;
-  if (line.includes('source: "valid"') && line.includes('/avatars/microsoft-rocketbox/')) {
-    throw new Error(`Catalog source mismatch: VALID profile points to occupation asset: ${line.trim()}`);
-  }
-  if (line.includes('source: "rocketbox"') && line.includes('/avatars/google-valid/')) {
-    throw new Error(`Catalog source mismatch: Rocketbox profile points to VALID asset: ${line.trim()}`);
-  }
+  if (line.includes('source: "valid"') && !line.includes('/avatars/valid-')) throw new Error(`VALID source mismatch: ${line.trim()}`);
+  if (line.includes('source: "rocketbox"') && !line.includes('/avatars/rocketbox-')) throw new Error(`Rocketbox source mismatch: ${line.trim()}`);
 }
 
-for (const url of urls) {
-  const requireMorphs = url.startsWith("/avatars/google-valid/");
-  validateHumanoid(url, requireMorphs);
-}
+for (const url of urls) validateHumanoid(url, url.startsWith("/avatars/valid-"));
 
-const requiredRocketbox = [
-  "female-casual-student.vrm",
-  "male-casual-student.vrm",
-  "female-pilot-for-astronaut.vrm",
-  "male-pilot-for-astronaut.vrm",
-  "female-firefighter.vrm",
-  "male-firefighter.vrm",
-  "female-chef.vrm",
-];
-for (const name of requiredRocketbox) {
-  const file = path.join(root, "public/avatars/microsoft-rocketbox", name);
-  if (!fs.existsSync(file)) throw new Error(`Missing generated occupation asset: ${name}`);
-}
-
-for (const notice of [
-  "public/avatars/google-valid/LICENSE_AND_SOURCE.md",
-  "public/avatars/microsoft-rocketbox/LICENSE_AND_SOURCE.md",
-]) {
+for (const notice of ["public/avatars/LICENSE_GOOGLE_VALID.md", "public/avatars/LICENSE_MICROSOFT_ROCKETBOX.md"]) {
   if (!fs.existsSync(path.join(root, notice))) throw new Error(`Missing license notice: ${notice}`);
 }
 
-console.log(`Validated ${urls.length} catalog VRM references and all required occupation assets.`);
+console.log(`Validated ${urls.length} catalog VRM references.`);

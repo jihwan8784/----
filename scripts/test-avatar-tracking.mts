@@ -11,10 +11,10 @@
  */
 import * as THREE from "three";
 
-import { createMannequin } from "./fixtures/mannequin";
-import { PoseSolver } from "../src/lib/avatar/solver";
-import { MIRROR_PAIRS } from "../src/lib/tracking/landmarks";
-import type { JointName, Joints, TrackFrame, Vec3 } from "../src/lib/tracking-types";
+import { createMannequin } from "./test-mannequin";
+import { PoseSolver } from "../src/core/motion-solver";
+import { MIRROR_PAIRS } from "../src/core/tracking-landmarks";
+import type { JointName, Joints, TrackFrame, Vec3 } from "../src/core/types";
 
 type MPPoint = [number, number, number];
 

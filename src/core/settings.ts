@@ -5,7 +5,7 @@ import { create } from "zustand";
 import type {
   BackgroundKind,
   CameraPreset,
-} from "@/lib/scene/avatar-scene-viewer";
+} from "@/core/scene-viewer";
 
 export interface Settings {
   mirror: boolean;
@@ -39,7 +39,7 @@ interface Store extends Settings {
 const initial: Settings = {
   mirror: true,
 
-  vrmUrl: "/avatars/microsoft-rocketbox/male-casual-student.vrm",
+  vrmUrl: "/avatars/rocketbox-male-casual-student.vrm",
   vrmName: "남성형 학생 · Rocketbox 현실형 일상복",
   skinColor: "#efc29f",
   hairColor: "#2a211f",

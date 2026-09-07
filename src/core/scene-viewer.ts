@@ -1,16 +1,16 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-import type { AvatarRig } from "@/lib/avatar/rig";
-import { PoseSolver, type SolverSettings } from "@/lib/avatar/solver";
+import type { AvatarRig } from "@/core/avatar-rig";
+import { PoseSolver, type SolverSettings } from "@/core/motion-solver";
 import {
   IdleBlinker,
   NEUTRAL_FACE,
   driveFromBlendshapes,
   type FaceDrive,
-} from "@/lib/avatar/expressions";
-import { damp } from "@/lib/tracking/smoothing";
-import type { TrackFrame } from "@/lib/tracking-types";
+} from "@/core/face-expressions";
+import { damp } from "@/core/tracking-smoothing";
+import type { TrackFrame } from "@/core/types";
 
 export type BackgroundKind =
   | "gradient"
@@ -170,11 +170,11 @@ export class AvatarViewer {
     }
     const imageUrl =
       kind === "ai-stage"
-        ? "/backgrounds/ai-stage.png"
+        ? "/background-ai-stage.png"
         : kind === "neon-city"
-          ? "/backgrounds/neon-city.png"
+          ? "/background-neon-city.png"
           : kind === "busan-future"
-            ? "/backgrounds/busan-future.png"
+            ? "/background-busan-future.png"
             : kind === "custom"
               ? customUrl
               : null;

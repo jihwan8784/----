@@ -8,7 +8,7 @@ import type {
   BoneName,
   ExpressionName,
   RigMetrics,
-} from "./rig";
+} from "./avatar-rig";
 
 const DEG = 180 / Math.PI;
 
