@@ -11,7 +11,7 @@
  */
 import * as THREE from "three";
 
-import { createMannequin } from "../src/lib/avatar/mannequin";
+import { createMannequin } from "./fixtures/mannequin";
 import { PoseSolver } from "../src/lib/avatar/solver";
 import { MIRROR_PAIRS } from "../src/lib/tracking/landmarks";
 import type { JointName, Joints, TrackFrame, Vec3 } from "../src/lib/tracking-types";
