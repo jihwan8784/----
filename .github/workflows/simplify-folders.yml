@@ -34,6 +34,27 @@ jobs:
           PY
           python scripts/simplify-repository.py
 
+          python - <<'PY'
+          from pathlib import Path
+          fixes = {
+              'src/core/face-expressions.ts': {'"./rig"': '"./avatar-rig"'},
+              'src/core/motion-solver.ts': {'"./rig"': '"./avatar-rig"'},
+              'src/core/vrm-loader.ts': {'"./rig"': '"./avatar-rig"'},
+              'src/core/tracking-engine.ts': {
+                  '"./landmarks"': '"./tracking-landmarks"',
+                  '"./smoothing"': '"./tracking-smoothing"',
+              },
+              'src/core/tracking-overlay.ts': {'"./landmarks"': '"./tracking-landmarks"'},
+              'scripts/test-mannequin.ts': {'"./rig"': '"../src/core/avatar-rig"'},
+          }
+          for filename, replacements in fixes.items():
+              path = Path(filename)
+              text = path.read_text()
+              for old, new in replacements.items():
+                  text = text.replace(old, new)
+              path.write_text(text)
+          PY
+
       - name: Use Node.js 22
         uses: actions/setup-node@v4
         with:
