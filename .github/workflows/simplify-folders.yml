@@ -1,0 +1,48 @@
+name: Simplify repository folders
+
+on:
+  push:
+    branches:
+      - simplify-folders-20260907
+
+permissions:
+  contents: write
+
+jobs:
+  simplify-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out cleanup branch
+        uses: actions/checkout@v4
+
+      - name: Simplify folders and filenames
+        run: python scripts/simplify-repository.py
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate simplified project
+        run: |
+          npm run check:rig
+          npm run check:assets
+          npm run lint
+          npm run build
+
+      - name: Remove one-time migration files
+        run: |
+          rm -f scripts/simplify-repository.py
+          rm -f .github/workflows/simplify-folders.yml
+
+      - name: Commit validated cleanup
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Simplify project folders and filenames'
+          git push origin HEAD:simplify-folders-20260907
