@@ -14,65 +14,42 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out branch
-        uses: actions/checkout@v4
-
       - name: Download ready-made VRM candidates
         run: |
           set -euo pipefail
           mkdir -p /tmp/vrm-candidates
           for name in nova kai sky ember; do
             curl -fL --retry 3 "https://vtubeme.com/media/free/${name}/model.vrm" -o "/tmp/vrm-candidates/${name}.vrm"
-            echo "=== ${name} page preview metadata ==="
-            curl -fsSL "https://vtubeme.com/free-vrm-avatars/${name}" \
-              | tr '>' '>\n' \
-              | grep -Ei 'og:image|twitter:image|image_src|preview|thumbnail' \
-              | head -20 || true
           done
-          ls -lh /tmp/vrm-candidates
 
-      - name: Inspect VRM metadata and structure
+      - name: Inspect gender-coded asset names
         run: |
           python - <<'PY'
           from pathlib import Path
-          import json, struct
+          import json, struct, re
 
-          def glb_json(path: Path):
+          for path in sorted(Path('/tmp/vrm-candidates').glob('*.vrm')):
               data = path.read_bytes()
-              if data[:4] != b'glTF':
-                  raise RuntimeError(f'{path.name}: not GLB/VRM')
-              version, total = struct.unpack_from('<II', data, 4)
               off = 12
-              js = None
+              doc = None
               while off + 8 <= len(data):
                   size, typ = struct.unpack_from('<II', data, off)
                   off += 8
                   chunk = data[off:off+size]
                   off += size
                   if typ == 0x4E4F534A:
-                      js = json.loads(chunk.rstrip(b'\x00 \t\r\n').decode('utf-8'))
+                      doc = json.loads(chunk.rstrip(b'\x00 \t\r\n').decode())
                       break
-              if js is None:
-                  raise RuntimeError(f'{path.name}: no JSON chunk')
-              return version, total, js
-
-          for path in sorted(Path('/tmp/vrm-candidates').glob('*.vrm')):
-              version, total, doc = glb_json(path)
-              ext = doc.get('extensions', {})
-              meta1 = ext.get('VRMC_vrm', {}).get('meta', {})
-              meta0 = ext.get('VRM', {}).get('meta', {})
-              meta = meta1 or meta0
-              vrm_version = '1.0' if 'VRMC_vrm' in ext else ('0.x' if 'VRM' in ext else 'unknown')
-              humanoid = ext.get('VRMC_vrm', {}).get('humanoid', {}) or ext.get('VRM', {}).get('humanoid', {})
-              human_bones = humanoid.get('humanBones', {})
-              if isinstance(human_bones, list):
-                  bone_names = [x.get('bone') for x in human_bones]
-              else:
-                  bone_names = list(human_bones.keys())
-              print('\n===', path.name, '===')
-              print('size_mb:', round(total/1024/1024, 2), 'glb_version:', version, 'vrm_version:', vrm_version)
-              print('meta:', json.dumps(meta, ensure_ascii=False, indent=2)[:5000])
-              print('nodes:', len(doc.get('nodes', [])), 'meshes:', len(doc.get('meshes', [])), 'materials:', len(doc.get('materials', [])), 'images:', len(doc.get('images', [])))
-              print('humanoid_bones:', bone_names)
-              print('material_names:', [m.get('name') for m in doc.get('materials', [])][:80])
+              assert doc
+              names = []
+              for key in ('nodes', 'meshes', 'materials', 'images', 'textures'):
+                  for item in doc.get(key, []):
+                      for field in ('name', 'uri'):
+                          value = item.get(field)
+                          if value:
+                              names.append(f'{key}:{field}:{value}')
+              matches = [x for x in names if re.search(r'(^|[^a-z])(male|female|man|woman|boy|girl)([^a-z]|$)', x, re.I)]
+              print(f'=== {path.name} ===')
+              print('gender-coded names:', matches)
+              print('image names:', [x for x in names if x.startswith('images:')])
           PY
