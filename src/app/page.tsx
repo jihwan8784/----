@@ -1,4 +1,4 @@
-import { AvatarStudio } from "@/AvatarStudio";
+import { AvatarStudio } from "@/components/AvatarStudio";
 
 export default function Page() {
   return (

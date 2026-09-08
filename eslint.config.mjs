@@ -12,8 +12,6 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Generated MediaPipe runtime copied by postinstall.
-    "public/mediapipe/wasm/**",
   ]),
 ]);
 

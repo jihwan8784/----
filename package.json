@@ -7,9 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "node scripts/prepare-mediapipe-wasm.mjs",
-    "check:tracking": "node --import tsx scripts/test-avatar-tracking.mts",
-    "check:avatars": "node scripts/validate-avatar-files.mjs"
+    "check:rig": "tsx scripts/rig-check.mts",
+    "postinstall": "node scripts/copy-wasm.mjs"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
